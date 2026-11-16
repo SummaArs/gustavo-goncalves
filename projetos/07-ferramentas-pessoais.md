@@ -12,7 +12,7 @@ App de notas onde a tela é um sistema solar: você é o sol, as notas são plan
 
 Em novembro de 2026 apaguei código antigo pra liberar espaço no disco e perdi coisa. Recuperei o que deu de três lugares: os 27 repositórios do GitHub com histórico inteiro, a lixeira, e o histórico das sessões de programação, de onde reconstruí 68 arquivos reaplicando cada edição em ordem. Antes de confiar no reconstrutor, rodei ele em arquivos que ainda existiam pra ver se batia, e plantei um bug pra ver se a conferência pegava.
 
-Depois fiz o backup automático pra isso não acontecer de novo: copia tudo a cada 6 horas pro meu Dropbox pessoal, nunca apaga lá o que eu apaguei aqui (foi exatamente o meu acidente), cada repositório vira um arquivo único com o histórico, e senha nenhuma sai da máquina. 200 tentativas adversariais, 0 violações, 8 de 8 bugs plantados pegos. [Código](../codigo/backup_dropbox/).
+Depois fiz o backup automático pra isso não acontecer de novo: copia o que mudou a cada 2 minutos pro Dropbox da empresa, na pasta de projetos de desenvolvimento, nunca apaga lá o que eu apaguei aqui (foi exatamente o meu acidente), cada repositório vira um arquivo único com o histórico, e senha nenhuma sai da máquina. 200 tentativas adversariais, 0 violações, 8 de 8 bugs plantados pegos. [Código](../codigo/backup_dropbox/).
 
 ## Kit de prova
 

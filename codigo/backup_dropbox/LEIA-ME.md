@@ -1,6 +1,6 @@
-# AIRBPO-backup — o que é e como restaurar
+# 00. ICT_BACKUP_AUTOMATICO — o que é e como restaurar
 
-Cópia automática (a cada 6 h) de tudo que o Gustavo e o Claude produzem neste Mac:
+Cópia automática (a cada 2 minutos, só o que mudou) de tudo que o Gustavo e o Claude produzem neste Mac:
 
 | Pasta aqui            | De onde vem                     |
 |-----------------------|---------------------------------|

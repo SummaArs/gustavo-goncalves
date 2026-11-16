@@ -4,7 +4,7 @@ O mais recente fica em cima. Cada projeto novo ganha uma linha aqui e um trecho 
 
 ## Novembro de 2026
 
-- 16/11 Perdi código ao liberar espaço no disco. Recuperei 27 repositórios, a lixeira e 68 arquivos reconstruídos do histórico. Fiz o backup automático pro Dropbox pessoal e este portfólio, com portão que barra dado de cliente.
+- 16/11 Perdi código ao liberar espaço no disco. Recuperei 27 repositórios, a lixeira e 68 arquivos reconstruídos do histórico. Fiz o backup automático pro Dropbox da empresa (a cada 2 minutos) e este portfólio, que agora é público, com portão que barra dado de cliente.
 - 12/11 Portal de vendas B2B: protótipo aprovado e app iniciado na plataforma.
 - 10/11 Contas bancárias nas 3 bases das farmácias, 0 divergências.
 - 08/11 Plataforma de diagnóstico ganhou registro de quem tenta invadir e conta-isca.

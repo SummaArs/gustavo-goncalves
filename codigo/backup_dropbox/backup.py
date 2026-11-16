@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Backup de tudo que fazemos (código + Claude) para o Dropbox PESSOAL do Gustavo.
+"""Backup de tudo que fazemos (código + Claude) para a pasta ICT_PROJETOS_DE_DESENVOLVIMENTO
+do Dropbox da AIRBPO, a cada 2 minutos (uma passada sem mudança leva ~1 s para 45 mil arquivos).
 
 Regras (o porquê de cada uma está no LEIA-ME.md):
   - só copia o que mudou (tamanho ou data diferentes) e NUNCA apaga no destino:
@@ -17,7 +18,8 @@ import argparse, fcntl, hashlib, json, os, shutil, subprocess, sys, time
 
 H = os.path.expanduser('~')
 FONTES = [H + '/Python', H + '/.claude', H + '/Documents/DEV']
-PASTA_BACKUP = 'AIRBPO-backup'
+ICT = H + '/Library/CloudStorage/Dropbox-Empresa/07. AIR_PROJETOS_INTERNOS/00. ICT_PROJETOS_DE_DESENVOLVIMENTO'
+PASTA_BACKUP = '00. ICT_BACKUP_AUTOMATICO'  # subpasta: não mistura com as pastas de 8 slots por projeto
 PULA_DIR = {'node_modules', '.venv', 'venv', '__pycache__', '.git', '.pytest_cache',
             '.mypy_cache', '.next', '.cache', 'site-packages', '.Trash'}
 # dentro de ~/.claude: lixo de execução, não memória
@@ -32,14 +34,11 @@ def eh_segredo(nome):
 
 
 def acha_destino():
-    """Dropbox pessoal = a única pasta Dropbox em CloudStorage que não é a da AIRBPO.
-    Zero ou duas candidatas -> falha fechado (não chuta)."""
-    base = H + '/Library/CloudStorage'
-    cand = [os.path.join(base, d) for d in os.listdir(base)
-            if d.startswith('Dropbox') and 'AIRBPO' not in d.upper()]
-    if len(cand) != 1:
-        sys.exit(f'ERRO: esperava 1 Dropbox pessoal em {base}, achei {cand}. Vincule a conta pessoal no app Dropbox.')
-    return os.path.join(cand[0], PASTA_BACKUP)
+    """Pasta ICT do Dropbox da AIRBPO. Se ela não existe (Dropbox desligado/desmontado),
+    falha fechado: criar a pasta do zero faria o backup ir para um lugar que não sincroniza."""
+    if not os.path.isdir(ICT):
+        sys.exit(f'ERRO: pasta ICT não encontrada ({ICT}). O Dropbox está aberto?')
+    return os.path.join(ICT, PASTA_BACKUP)
 
 
 def rel_destino(fonte, p):
