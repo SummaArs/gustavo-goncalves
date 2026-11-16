@@ -13,7 +13,7 @@ import hashlib, os, random, shutil, subprocess, sys, tempfile
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 # repo real, só leitura, com ramo FORA do HEAD (8 commits no total, 6 no HEAD): pega bundle que só leva o HEAD
-REPO = os.path.expanduser('~/Documents/DEV/repo/central/projeto-teste')
+REPO = os.path.expanduser('~/Documents/DEV/repo/central/teste-gustavo-sidecar-pedidos')
 NOMES = ['a.py', 'Ação ç.txt', 'com espaço.md', 'x' * 120 + '.js', 'vazio', '.env', '.env.local',
          'chave.pem', 'cert.pfx', 'id.key', 'ok.json', 'NFD_ação.txt', 'dados.db', '.oculto']
 DIRS = ['', 'sub', 'sub/deep', 'node_modules/pkg', '__pycache__', 'proj/.venv/lib', 'Pasta Ç']
@@ -65,7 +65,7 @@ def tentativa(rng, script, tmp):
         if not os.path.exists(alvo(apagado)): return 'I3'
         if vivos and sha(mud) != sha(alvo(mud)): return 'I1 alteração não propagou'
     # I6
-    b = os.path.join(dest, '_git', 'Documents-DEV-repo-central-projeto-teste.bundle')
+    b = os.path.join(dest, '_git', 'Documents-DEV-repo-central-teste-gustavo-sidecar-pedidos.bundle')
     if not os.path.exists(b): return 'I6 sem bundle'
     clone = os.path.join(tmp, 'clone')
     r = subprocess.run(['git', 'clone', '-q', '--mirror', '--template=', b, clone], capture_output=True)

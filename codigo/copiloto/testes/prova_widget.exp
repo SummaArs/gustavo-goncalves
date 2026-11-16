@@ -60,7 +60,7 @@ send "\r"
 prompt
 send "echo ONDE=\$(basename \$PWD)\r"
 expect {
-  -re {ONDE=projeto-teste} {
+  -re {ONDE=teste-gustavo-sidecar-pedidos} {
       ok "a sugestão executou de verdade (conferido no PWD)" }
   timeout { erro "PWD não confirmou a troca de pasta" }
 }
@@ -99,7 +99,7 @@ send "cd $alvo && rm -rf $canario\r"
 prompt
 
 # ── 3. conserto do último comando que falhou (linha vazia + Ctrl+O) ──────
-send "cd taca_nfse\r"
+send "cd casa_nfse\r"
 expect {
   -re {Ctrl\+O} { ok "o erro anterior foi detectado e avisado (com a tecla certa)" }
   timeout { erro "não avisou sobre o comando que falhou" }
@@ -110,14 +110,14 @@ expect {
 sleep 0.8
 send "\x0f"
 expect {
-  -re {projeto-exemplo} { ok "Ctrl+O na linha vazia consertou o erro anterior" }
+  -re {casa-nfse-omie} { ok "Ctrl+O na linha vazia consertou o erro anterior" }
   timeout { erro "não consertou o comando anterior" }
 }
 send "\r"
 prompt
 send "echo ONDE=\$(basename \$PWD)\r"
 expect {
-  -re {ONDE=projeto-exemplo} { ok "o conserto do erro executou (conferido no PWD)" }
+  -re {ONDE=casa-nfse-omie} { ok "o conserto do erro executou (conferido no PWD)" }
   timeout { erro "PWD não confirmou o conserto" }
 }
 prompt

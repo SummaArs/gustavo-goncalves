@@ -63,7 +63,7 @@ PEDIDOS = [
     "mostrar o que mudou no git", "matar o processo da porta 3000",
 ]
 NOMES = [
-    "projeto-teste", "projeto-exemplo", "relatório final.pdf",
+    "teste-gustavo-sidecar-pedidos", "casa-nfse-omie", "relatório final.pdf",
     "package.json", "não_lidos", "Ata Reunião 2026.docx", "emissor_zero_toque",
     "a", "x" * 90, "arquivo com  dois espaços.txt", "café.csv", "ÍNDICE.md",
     "kit_ferramentas", "hemos", "smartbox", "20260811_SSP_BRL_-1234_x.pdf",

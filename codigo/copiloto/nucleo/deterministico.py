@@ -2,7 +2,7 @@
 
 Antes de acordar uma IA de 2 GB, resolve o que é conta: distância de edição
 entre o que você digitou e os nomes que realmente existem. É essa camada que
-conserta `cd teste_g` -> `cd projeto-teste` sem consultar nada.
+conserta `cd teste_g` -> `cd teste-gustavo-sidecar-pedidos` sem consultar nada.
 
 Porta de confiança (Lei 5): abaixo do limiar ela **não chuta** — devolve nada e
 deixa a camada neural tentar. Ferramenta que chuta é pior que ferramenta burra.

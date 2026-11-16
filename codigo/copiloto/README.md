@@ -5,7 +5,7 @@ linha vira o comando certo. Roda inteiro no seu Mac: nenhuma requisição sai da
 máquina, nenhum token é gasto, funciona sem internet.
 
 ```
-cd teste_g                      ⌃O →  cd projeto-teste
+cd teste_g                      ⌃O →  cd teste-gustavo-sidecar-pedidos
 quantos json tem aqui           ⌃O →  find . -type f -name '*.json' | wc -l
 apagar os temporários           ⌃O →  # REVISE ANTES DE RODAR: find . -type f -delete
 (linha vazia, após um erro)     ⌃O →  conserta o último comando que falhou

@@ -18,7 +18,7 @@ import types
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 import importlib.util  # noqa: E402  (o arnês do kit tem o mesmo nome deste arquivo: carregar pelo caminho)
-_esp = importlib.util.spec_from_file_location("kit_prova", os.path.join(AQUI, "..", "kit_ferramentas", "prova.py"))
+_esp = importlib.util.spec_from_file_location("kit_prova", os.path.join(AQUI, "..", "kit_prova", "prova.py"))
 _kit = importlib.util.module_from_spec(_esp)
 _esp.loader.exec_module(_kit)
 provar, executar = _kit.provar, _kit.executar

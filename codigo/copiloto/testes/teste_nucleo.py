@@ -32,9 +32,9 @@ def checar(id_: str, condicao: bool, detalhe: str = "") -> None:
         falhas.append(f"{id_}: {detalhe}")
 
 
-def ctx_falso(itens=("projeto-teste", "projeto-exemplo",
+def ctx_falso(itens=("teste-gustavo-sidecar-pedidos", "casa-nfse-omie",
                      "relatório final.pdf", "package.json"),
-              pastas=("projeto-teste", "projeto-exemplo")):
+              pastas=("teste-gustavo-sidecar-pedidos", "casa-nfse-omie")):
     return ctxmod.Contexto(
         cwd="/Users/x/central", itens=tuple(itens), pastas=frozenset(pastas),
         comandos=frozenset({"ls", "cd", "git", "python3", "npm", "find",
@@ -108,12 +108,12 @@ def i5_i6_i10_matematica():
     b = deterministico.resolver("cd teste_g", ctx)
     checar("I5", [c.comando for c in a] == [c.comando for c in b],
            "camada 1 não é determinística")
-    checar("I6", bool(a) and a[0].comando == "cd projeto-teste",
+    checar("I6", bool(a) and a[0].comando == "cd teste-gustavo-sidecar-pedidos",
            f"não consertou o caso do print: {[c.comando for c in a]}")
 
     # nunca inventa nome: todo argumento que não é opção existe no contexto
-    for pedido in ("cd taca", "ls relatorio final.pdf", "cd TESTE-GUSTAVO",
-                   "cd tacanfse", "ls package", "cd teste_g", "cd sidecar"):
+    for pedido in ("cd casa", "ls relatorio final.pdf", "cd TESTE-GUSTAVO",
+                   "cd casanfse", "ls package", "cd teste_g", "cd sidecar"):
         for c in deterministico.resolver(pedido, ctx):
             import shlex
             for token in shlex.split(c.comando)[1:]:   # respeita nome com espaço
@@ -196,10 +196,10 @@ def i13_i15_verificacao():
 
 # ── medida: quanto a camada 1 resolve sem IA ────────────────────────────
 def medir_camada1():
-    ctx = ctx_falso(itens=("projeto-teste", "projeto-exemplo",
+    ctx = ctx_falso(itens=("teste-gustavo-sidecar-pedidos", "casa-nfse-omie",
                            "emissor_zero_toque", "kit_ferramentas", "hemos",
                            "smartbox", "relatório final.pdf", "package.json"),
-                    pastas=("projeto-teste", "projeto-exemplo",
+                    pastas=("teste-gustavo-sidecar-pedidos", "casa-nfse-omie",
                             "emissor_zero_toque", "kit_ferramentas", "hemos",
                             "smartbox"))
     import random

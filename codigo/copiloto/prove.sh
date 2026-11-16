@@ -37,7 +37,7 @@ fi
 echo
 echo "── ponta a ponta: camadas 0 e 1 em disco real ──────────────"
 PASTA=$(mktemp -d)
-mkdir -p "$PASTA/projeto-teste" "$PASTA/projeto-exemplo"
+mkdir -p "$PASTA/teste-gustavo-sidecar-pedidos" "$PASTA/casa-nfse-omie"
 printf '{"scripts":{"dev":"vite","ooncore:docs":"node x.js"}}' > "$PASTA/package.json"
 cd "$PASTA"
 SAIDA=$(python3 - <<'PY'
@@ -46,8 +46,8 @@ sys.path.insert(0, os.environ["COP"])
 from copiloto import decidir
 from nucleo import contexto
 ctx = contexto.capturar()
-casos = [("cd teste_g", "cd projeto-teste"),
-         ("cd TACA", "cd projeto-exemplo"),
+casos = [("cd teste_g", "cd teste-gustavo-sidecar-pedidos"),
+         ("cd TACA", "cd casa-nfse-omie"),
          ("voltar", "cd .."),
          ("git status", "git status")]
 piores = 0.0
@@ -75,7 +75,7 @@ if [ "$1" != "-r" ]; then
     echo "── ponta a ponta: widget em terminal real (pty) ─────────────"
     if [ ! -x /usr/bin/expect ]; then
         echo "  — expect ausente: widget não testado"
-    elif [ ! -d "$HOME/Documents/DEV/repo/central/projeto-teste" ]; then
+    elif [ ! -d "$HOME/Documents/DEV/repo/central/teste-gustavo-sidecar-pedidos" ]; then
         echo "  — pasta de referência ausente: widget não testado"
     else
         ./testes/prova_widget.exp
