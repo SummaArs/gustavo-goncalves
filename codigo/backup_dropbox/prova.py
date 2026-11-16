@@ -8,6 +8,7 @@ Invariantes (o que NUNCA pode acontecer):
   I5 nada de node_modules/__pycache__/.git no destino; nada fora do destino
   I6 bundle do repositório não clona ou perde commit
   I7 --conferir não acusa um arquivo corrompido no destino
+  I8 pasta sem permissão de leitura some do backup sem erro (o os.walk engole por padrão)
 """
 import hashlib, os, random, shutil, subprocess, sys, tempfile
 
@@ -64,6 +65,17 @@ def tentativa(rng, script, tmp):
         roda(script, '--destino', dest, '--fontes', fonte, REPO)
         if not os.path.exists(alvo(apagado)): return 'I3'
         if vivos and sha(mud) != sha(alvo(mud)): return 'I1 alteração não propagou'
+    # I8 pasta sem permissão de leitura: tem de virar erro (exit != 0), nunca sumir calada
+    trancada = os.path.join(fonte, 'trancada'); os.makedirs(trancada, exist_ok=True)
+    open(os.path.join(trancada, 'x.py'), 'w').write('1')
+    os.chmod(trancada, 0)
+    try:
+        c, out = roda(script, '--destino', dest, '--fontes', fonte, REPO)
+    finally:
+        os.chmod(trancada, 0o755)
+    if c == 0 or 'trancada' not in out: return 'I8 pasta ilegível sumiu sem erro'
+    shutil.rmtree(trancada)
+    roda(script, '--destino', dest, '--fontes', fonte, REPO)
     # I6
     b = os.path.join(dest, '_git', 'Documents-DEV-repo-central-teste-gustavo-sidecar-pedidos.bundle')
     if not os.path.exists(b): return 'I6 sem bundle'
@@ -105,6 +117,7 @@ MUTANTES = [
     ('copia node_modules', "PULA_DIR = {'node_modules', ", "PULA_DIR = {"),
     ('conferir cego', "ok = os.path.exists(dst) and sha(p) == sha(dst)", "ok = os.path.exists(dst)"),
     ('bundle só do HEAD', "'create', tmp, '--all'", "'create', tmp, 'HEAD'"),
+    ('engole pasta ilegível', "os.walk(fonte, onerror=falhas.append)", "os.walk(fonte)"),
     ('escapa do destino', "    nome = base.replace('/', '-').lstrip('.')", "    nome = os.path.relpath(fonte, H)"),
 ]
 

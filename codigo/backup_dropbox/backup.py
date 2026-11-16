@@ -24,7 +24,7 @@ PULA_DIR = {'node_modules', '.venv', 'venv', '__pycache__', '.git', '.pytest_cac
             '.mypy_cache', '.next', '.cache', 'site-packages', '.Trash'}
 # dentro de ~/.claude: lixo de execução, não memória
 PULA_CAMINHO = {H + '/.claude/' + x for x in ('file-history', 'shell-snapshots', 'debug',
-                'session-env', 'statsig', 'telemetry', 'ide', 'daemon', 'bridge-spawn')}
+                'session-env', 'statsig', 'telemetry', 'ide', 'daemon', 'bridge-spawn', 'seed-admin')}
 SEGREDO_EXT = ('.pem', '.pfx', '.key', '.p12')
 PULA_ARQ = {'.DS_Store', '.credentials.json'}
 
@@ -52,7 +52,8 @@ def rel_destino(fonte, p):
 def varre(fonte):
     """Gera (arquivo, repo_git) e devolve via listas; não segue link simbólico."""
     arqs, repos, segredos = [], [], []
-    for d, ds, fs in os.walk(fonte):
+    falhas = []  # os.walk engole erro de permissão por padrão: aqui ele vira erro visível
+    for d, ds, fs in os.walk(fonte, onerror=falhas.append):
         if os.path.isdir(os.path.join(d, '.git')):
             repos.append(d)
         ds[:] = sorted(x for x in ds if x not in PULA_DIR and os.path.join(d, x) not in PULA_CAMINHO
@@ -66,7 +67,7 @@ def varre(fonte):
                 segredos.append(p)
                 continue
             arqs.append(p)
-    return arqs, repos, segredos
+    return arqs, repos, segredos, falhas
 
 
 def copia(src, dst):
@@ -74,6 +75,9 @@ def copia(src, dst):
     tmp = dst + '.copiando'
     shutil.copy2(src, tmp)
     os.replace(tmp, dst)  # quem olha o destino nunca vê arquivo pela metade
+
+
+VAZIO = hashlib.sha256(b'').hexdigest()
 
 
 def impressao_git(repo):
@@ -112,13 +116,13 @@ def main():
     a = ap.parse_args()
     destino = a.destino or acha_destino()
     fontes = a.fontes or FONTES
-    os.makedirs(destino, exist_ok=True)
-
-    trava = open(os.path.join(destino, '.trava'), 'w')
-    try:
-        fcntl.flock(trava, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        sys.exit('outro backup já está rodando')
+    if not a.conferir:  # conferir só lê: não precisa (nem sempre pode) gravar no destino
+        os.makedirs(destino, exist_ok=True)
+        trava = open(os.path.join(destino, '.trava'), 'w')
+        try:
+            fcntl.flock(trava, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            sys.exit('outro backup já está rodando')
 
     est_p = os.path.join(destino, '_estado.json')
     estado = json.load(open(est_p)) if os.path.exists(est_p) else {}
@@ -131,11 +135,13 @@ def main():
             erros.append(f'fonte não existe: {fonte}'); n['erros'] += 1
             continue
         try:
-            arqs, repos, segredos = varre(fonte)
+            arqs, repos, segredos, falhas = varre(fonte)
         except PermissionError as e:
             erros.append(f'sem permissão de ler {fonte}: {e}'); n['erros'] += 1
             continue
         todos_segredos += segredos
+        for e in falhas:
+            n['erros'] += 1; erros.append(f'sem acesso (pasta NÃO copiada): {e.filename}: {e.strerror}')
         for p in arqs:
             dst = os.path.join(destino, rel_destino(fonte, p))
             try:
@@ -158,6 +164,8 @@ def main():
             continue
         for repo in repos:
             imp = impressao_git(repo)
+            if imp == VAZIO:  # repositório sem nenhum commit: não há histórico para guardar
+                continue
             dst = os.path.join(destino, '_git', rel_destino(fonte, repo) + '.bundle')
             if imp and estado.get(repo) == imp and os.path.exists(dst):
                 n['bundles_iguais'] += 1
