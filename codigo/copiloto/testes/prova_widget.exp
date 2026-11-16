@@ -1,0 +1,175 @@
+#!/usr/bin/expect -f
+# Prova o COPILOTO num terminal DE VERDADE (pty), com o .zshrc de verdade.
+#
+# Por que expect: `zsh -i -c` não tem zle, então widget nenhum roda ali. E a
+# verificação nunca é feita pelo que a tela mostra — é pelo `pwd` depois do
+# Enter e por arquivos-canário que precisam sobreviver (fonte da verdade).
+#
+#   ./testes/prova_widget.exp            silencioso
+#   ./testes/prova_widget.exp -v         mostra o terminal cru (para depurar)
+
+set timeout 25
+set falhas 0
+set alvo "/Users/voce/Documents/DEV/repo/central"
+set canario "/tmp/copiloto_prova_canario"
+log_user 0
+if {[llength $argv] > 0 && [lindex $argv 0] eq "-v"} { log_user 1 }
+
+# Um Terminal.app real vem com locale UTF-8; um pty cru não. Sem isto, o zle
+# morre no primeiro caractere acentuado que eu digitar — e o "bug" seria do
+# arnês, não do copiloto. Levei uma hora para descobrir; fica registrado.
+set env(LANG) "en_US.UTF-8"
+set env(LC_ALL) "en_US.UTF-8"
+
+proc ok {msg}   { puts "  ✓ $msg" }
+proc erro {msg} { global falhas; incr falhas; puts "  ✗ $msg" }
+
+# Esperar o prompt "% " é armadilha: o zsh cospe escapes (bracketed paste,
+# cores) DEPOIS dele, então a ancoragem no fim da linha falha e cada passo
+# esperava o timeout inteiro. Marcador determinístico resolve: as aspas fazem o
+# eco do que digitei ser diferente da SAÍDA do echo, então só a saída casa.
+proc prompt {} {
+  send "echo PRONTO\"\"OK\r"
+  expect { -timeout 30 -re {PRONTOOK} {} timeout {} }
+}
+
+spawn zsh -i
+prompt
+send "cd $alvo\r"
+prompt
+
+# ── 1. conserto determinístico: o caso exato do print ───────────────────
+#    Ctrl+O (\x0f) é a tecla principal; Ctrl+G vive sequestrado pelo Gemini.
+send "cd teste_g"
+sleep 0.4
+send "\x0f"
+expect {
+  -re {teste-gustavo-sidecar} { ok "Ctrl+O consertou 'cd teste_g'" }
+  timeout { erro "Ctrl+O não consertou 'cd teste_g'" }
+}
+send "\x15"
+prompt
+send "cd teste_g"
+sleep 0.4
+send "\x18g"
+expect {
+  -re {teste-gustavo-sidecar} { ok "Ctrl+X G (acorde reserva) também consertou" }
+  timeout { erro "Ctrl+X G não funcionou" }
+}
+send "\r"
+prompt
+send "echo ONDE=\$(basename \$PWD)\r"
+expect {
+  -re {ONDE=projeto-teste} {
+      ok "a sugestão executou de verdade (conferido no PWD)" }
+  timeout { erro "PWD não confirmou a troca de pasta" }
+}
+prompt
+send "cd ..\r"
+prompt
+
+# ── 2. guarda: destrutivo chega comentado E o Enter não apaga nada ───────
+send "rm -rf $canario; mkdir -p $canario; cd $canario; touch a.txt b.txt c.txt\r"
+prompt
+send "apagar todos os arquivos desta pasta"
+sleep 0.4
+send "\x0f"
+expect {
+  -re {RODAR:} { ok "pedido destrutivo voltou comentado" }
+  timeout { erro "pedido destrutivo NÃO voltou comentado" }
+}
+send "\r"
+prompt
+send "echo VIVOS=\$(ls | wc -l | tr -d ' ')\r"
+expect {
+  -re {VIVOS=3} { ok "os 3 arquivos-canário sobreviveram ao Enter" }
+  -re {VIVOS=[0-2]} { erro "O ENTER APAGOU ARQUIVO — blindagem falhou" }
+  timeout { erro "não consegui contar os canários" }
+}
+prompt
+# o '#' precisa ser comentário de verdade, não um programa inexistente
+send "# isto e um comentario\r"
+send "echo PRONTO\"\"OK\r"
+expect {
+  -re {command not found} { erro "'#' não é comentário: INTERACTIVE_COMMENTS off" }
+  -re {PRONTOOK} { ok "'#' é comentário de verdade (Enter é no-op)" }
+  timeout { erro "não deu para checar o '#'" }
+}
+send "cd $alvo && rm -rf $canario\r"
+prompt
+
+# ── 3. conserto do último comando que falhou (linha vazia + Ctrl+O) ──────
+send "cd taca_nfse\r"
+expect {
+  -re {Ctrl\+O} { ok "o erro anterior foi detectado e avisado (com a tecla certa)" }
+  timeout { erro "não avisou sobre o comando que falhou" }
+}
+# Sem marcador de sincronismo aqui: por projeto, um comando bem-sucedido apaga
+# a memória da falha (não fico oferecendo conserto de erro velho). O `echo` do
+# marcador contaria como sucesso e mataria justamente o que quero provar.
+sleep 0.8
+send "\x0f"
+expect {
+  -re {projeto-exemplo} { ok "Ctrl+O na linha vazia consertou o erro anterior" }
+  timeout { erro "não consertou o comando anterior" }
+}
+send "\r"
+prompt
+send "echo ONDE=\$(basename \$PWD)\r"
+expect {
+  -re {ONDE=projeto-exemplo} { ok "o conserto do erro executou (conferido no PWD)" }
+  timeout { erro "PWD não confirmou o conserto" }
+}
+prompt
+send "cd ..\r"
+prompt
+
+# ── 4. tradução do português (camada neural) ─────────────────────────────
+send "quantos arquivos json tem aqui contando as subpastas"
+sleep 0.4
+send "\x0f"
+expect {
+  -re {json} { ok "português virou comando (neural)" }
+  timeout { erro "não traduziu o pedido em português" }
+}
+send "\x15"
+prompt
+
+# ── 5. Ctrl+X E explica sem estragar a linha nem matar o shell ───────────
+send "du -sh */ | sort -rh | head -5"
+sleep 0.3
+send "\x18e"
+expect {
+  -re {(?i)(pasta|tamanho|ordena|maior|diret)} { ok "Ctrl+X E explicou em português" }
+  timeout { erro "Ctrl+X E não explicou" }
+}
+send "\x15"
+prompt
+send "echo VIVO=sim\r"
+expect {
+  -re {VIVO=sim} { ok "o shell continuou vivo depois de explicar" }
+  timeout { erro "o shell morreu ao explicar" }
+}
+prompt
+
+# ── 6. o Tab difuso conviveu com o copiloto ─────────────────────────────
+send "cd tac\t"
+sleep 1.2
+send "\x15"
+send "\x03"
+send "echo TAB=ok\r"
+expect {
+  -re {TAB=ok} { ok "Tab difuso conviveu com o copiloto (zle intacto)" }
+  timeout { erro "o zle travou depois do Tab" }
+}
+
+send "exit\r"
+expect eof
+
+puts ""
+if {$falhas == 0} {
+  puts "\033\[92m  widget provado em terminal real: 0 falhas.\033\[0m"
+  exit 0
+}
+puts "\033\[91m  $falhas falha(s) no widget.\033\[0m"
+exit 1

@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0a0a12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>COSMOS</title>
+<!--
+  COSMOS · Estação Universal 1.4.0 "Pulso" — o cosmos num arquivo só.
+  Zero dependências, zero servidor: abra em qualquer navegador de
+  Android, Windows, tablet ou desktop e funciona offline.
+  1.4.0: motor de céu por sprites (desenha 1x, carimba sempre; 30fps;
+  dorme quando invisível), Lab com modo AO VIVO (roda enquanto digita),
+  erros de sintaxe reportados com linha, tela dividida em ecrã largo,
+  Ctrl/Cmd+Enter executa, Esc fecha. Cofre WebCrypto (PBKDF2 600k →
+  AES-256-GCM — a web não tem scrypt nativo; honestidade registrada)
+  e backup completo .cosmosverse. Leve este arquivo para onde quiser:
+  ele É o app.
+-->
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --acc: 245, 176, 26; --acc2: 249, 115, 22; --soft: 253, 211, 92;
+    --ink: #ececf4; --mut: #9a9aac; --line: rgba(255,255,255,0.08);
+    --glass: rgba(18,18,28,0.94);
+  }
+  html, body { height: 100%; overscroll-behavior: none; }
+  body {
+    font-family: -apple-system, 'SF Pro Text', Roboto, system-ui, sans-serif;
+    background: radial-gradient(120% 90% at 50% 0%, #12121c 0%, #0a0a12 55%, #06060b 100%);
+    color: var(--ink);
+    overflow: hidden;
+    user-select: none;
+  }
+  #sky { position: fixed; inset: 0; width: 100%; height: 100%; }
+  #sky.warp { animation: warp 0.5s ease; }
+  @keyframes warp {
+    0%   { transform: scale(1);    opacity: 1; }
+    45%  { transform: scale(1.5);  opacity: 0; }
+    55%  { transform: scale(0.82); opacity: 0; }
+    100% { transform: scale(1);    opacity: 1; }
+  }
+  #sky.warp.up { animation: warpup 0.5s ease; }
+  @keyframes warpup {
+    0%   { transform: scale(1);    opacity: 1; }
+    45%  { transform: scale(0.7);  opacity: 0; }
+    55%  { transform: scale(1.3);  opacity: 0; }
+    100% { transform: scale(1);    opacity: 1; }
+  }
+
+  /* letreiro da estação: você-está-aqui, em fonte de console */
+  #hdr {
+    position: fixed; top: env(safe-area-inset-top, 0); left: 0; right: 0;
+    padding: 14px 16px 6px; text-align: left; z-index: 5; pointer-events: none;
+  }
+  #hdr .kind, #hdr .census, #trail { max-width: calc(100vw - 196px); }
+  #hdr .kind {
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 3px; color: rgba(var(--acc), 0.95);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #trail {
+    display: none; flex-wrap: wrap; gap: 2px; margin-top: 3px;
+    font-family: ui-monospace, monospace; font-size: 10.5px; letter-spacing: 1px;
+    color: var(--mut); pointer-events: auto;
+  }
+  #trail.on { display: flex; }
+  #trail .seg { padding: 2px 4px; border-radius: 5px; }
+  #trail .seg:active { background: rgba(255,255,255,0.08); }
+  #trail .sep { opacity: 0.4; padding: 2px 0; }
+  #trail .seg.here { color: rgb(var(--soft)); font-weight: 700; }
+  #hdr .census {
+    margin-top: 2px; font-family: ui-monospace, monospace;
+    font-size: 10px; letter-spacing: 1px; color: var(--mut);
+  }
+  #topbtns {
+    position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); right: 10px;
+    display: flex; gap: 7px; z-index: 6;
+  }
+  .chip {
+    padding: 7px 10px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--glass); color: var(--mut); font-size: 12.5px; font-weight: 600;
+  }
+  .chip:active { color: rgb(var(--soft)); border-color: rgba(var(--acc), 0.4); }
+
+  /* barra inferior: buscar/criar */
+  #bar {
+    position: fixed; left: 12px; right: 12px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    display: flex; align-items: center; gap: 8px;
+    background: var(--glass); border: 1px solid var(--line); border-radius: 16px;
+    padding: 4px 6px 4px 14px; z-index: 6;
+  }
+  #q { flex: 1; background: none; border: none; outline: none; color: var(--ink); font-size: 16px; padding: 10px 0; }
+  #q::placeholder { color: var(--mut); }
+  #go {
+    border: none; border-radius: 12px; padding: 10px 14px; font-weight: 700; font-size: 13px;
+    background: rgba(var(--acc), 0.2); color: rgb(var(--soft));
+  }
+  #results {
+    position: fixed; left: 12px; right: 12px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 66px);
+    max-height: 42vh; overflow-y: auto;
+    background: var(--glass); border: 1px solid var(--line); border-radius: 14px;
+    z-index: 6; display: none;
+  }
+  #results.on { display: block; }
+  .res { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .res:last-child { border-bottom: none; }
+  .res b { font-size: 14px; }
+  .res small { display: block; color: var(--mut); font-size: 11.5px; margin-top: 2px; }
+  .res small.mono { font-family: ui-monospace, monospace; letter-spacing: 0.5px; }
+
+  /* editor: cartão que sobe */
+  #sheet {
+    position: fixed; inset: 0; z-index: 10;
+    background: linear-gradient(180deg, #101018, #0a0a10);
+    display: flex; flex-direction: column;
+    transform: translateY(102%); transition: transform 0.3s cubic-bezier(0.3, 0.8, 0.3, 1);
+  }
+  #sheet.on { transform: translateY(0); }
+  #ehdr {
+    display: flex; align-items: center; gap: 5px;
+    padding: calc(env(safe-area-inset-top, 0px) + 10px) 10px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  #etitle { flex: 1; font-weight: 700; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ibtn {
+    border: 1px solid var(--line); background: rgba(255,255,255,0.04); color: var(--mut);
+    border-radius: 10px; padding: 8px 9px; font-size: 13px; min-width: 36px;
+  }
+  .ibtn:active { color: rgb(var(--soft)); }
+  #e-lang { font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+  #e-lang.live { color: rgb(var(--soft)); border-color: rgba(var(--acc), 0.4); }
+  #e-run { color: #8ce8ad; }
+
+  /* corpo do editor: coluna no celular, lado a lado no ecrã largo */
+  #ebody { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+  /* editor de texto + camada de destaque vivo (Laboratório) */
+  #ewrap { position: relative; flex: 1; min-height: 0; }
+  #eta, #hl {
+    position: absolute; inset: 0;
+    font: 15px/1.65 ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+    padding: 14px 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+    white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word;
+    overflow-y: auto; tab-size: 2;
+  }
+  #eta {
+    width: 100%; height: 100%; background: none; border: none; outline: none; resize: none;
+    color: var(--ink); z-index: 1;
+  }
+  #hl { display: none; z-index: 0; pointer-events: none; color: #c9d1e5; overflow: hidden; }
+  #ewrap.code #eta, #ewrap.code #hl { font-size: 13.5px; line-height: 1.6; }
+  #ewrap.code #eta { color: transparent; caret-color: rgb(var(--soft)); }
+  #ewrap.code #hl { display: block; }
+  .tk-cmt  { color: #6b7286; font-style: italic; }
+  .tk-str  { color: #8ce8ad; }
+  .tk-num  { color: #ffbd66; }
+  .tk-kw   { color: rgb(var(--soft)); font-weight: 600; }
+  .tk-fn   { color: #8fc7ff; }
+  .tk-tag  { color: #ff8fb3; }
+  .tk-attr { color: #8fc7ff; }
+
+  /* painel de execução do Lab */
+  #runpan {
+    display: none; border-top: 1px solid rgba(var(--acc), 0.25);
+    background: #05050a; max-height: 40vh; flex-shrink: 0;
+    flex-direction: column;
+  }
+  #runpan.on { display: flex; }
+  #runhdr {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; font-family: ui-monospace, monospace; font-size: 9.5px;
+    letter-spacing: 2px; color: rgba(var(--acc), 0.9);
+  }
+  #runtitle { flex: 1; }
+  .rbtn {
+    background: none; border: none; color: var(--mut); font-size: 10px;
+    font-family: ui-monospace, monospace; letter-spacing: 1.5px; padding: 3px 7px;
+  }
+  #run-live.live { color: #8ce8ad; }
+  #run-close { font-size: 13px; letter-spacing: 0; }
+  #runlog {
+    font: 12px/1.55 ui-monospace, monospace; padding: 4px 14px 12px; overflow-y: auto;
+    color: #9fe8b3; white-space: pre-wrap; word-break: break-word; user-select: text;
+  }
+  #runlog .err { color: #f87171; }
+  #runframe { width: 100%; height: 36vh; border: 0; background: #fff; display: none; }
+  #runframe.on { display: block; }
+  @media (min-width: 880px) {
+    #ebody.lab { flex-direction: row; }
+    #ebody.lab #runpan { width: 46%; max-height: none; border-top: none; border-left: 1px solid rgba(var(--acc), 0.25); }
+    #ebody.lab #runframe.on { height: auto; flex: 1; }
+    #ebody.lab #runlog { flex: 1; }
+  }
+
+  #eprev {
+    flex: 1; overflow-y: auto; display: none; user-select: text;
+    padding: 14px 18px calc(env(safe-area-inset-bottom, 0px) + 20px);
+    font-size: 15.5px; line-height: 1.65;
+  }
+  #eprev.on { display: block; }
+  #ewrap.off { display: none; }
+  #eprev h1 { font-size: 1.5em; margin: 0.4em 0; border-bottom: 2px solid rgba(var(--acc), 0.5); padding-bottom: 0.2em; }
+  #eprev h2 { font-size: 1.2em; margin: 0.8em 0 0.3em; color: rgb(var(--soft)); }
+  #eprev h3 { font-size: 1.05em; margin: 0.7em 0 0.3em; }
+  #eprev p, #eprev ul, #eprev ol, #eprev blockquote, #eprev pre, #eprev table { margin-bottom: 0.7em; }
+  #eprev ul, #eprev ol { padding-left: 1.3em; }
+  #eprev li.task { list-style: none; margin-left: -1.3em; }
+  #eprev blockquote { border-left: 3px solid rgba(var(--acc), 0.7); padding: 0.4em 0.8em; background: rgba(var(--acc), 0.07); border-radius: 0 6px 6px 0; color: var(--mut); }
+  #eprev code { font-family: ui-monospace, monospace; font-size: 0.88em; background: rgba(255,255,255,0.08); padding: 0.1em 0.35em; border-radius: 4px; }
+  #eprev pre { background: rgba(255,255,255,0.06); padding: 0.7em 0.9em; border-radius: 8px; overflow-x: auto; }
+  #eprev pre code { background: none; padding: 0; font-size: 0.85em; }
+  #eprev a { color: rgb(var(--soft)); }
+  #eprev mark { background: rgba(var(--acc), 0.3); color: var(--ink); border-radius: 2px; }
+  #eprev table { width: 100%; border-collapse: collapse; font-size: 0.92em; }
+  #eprev th { text-align: left; font-family: ui-monospace, monospace; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: rgb(var(--soft)); padding: 6px 8px; border-bottom: 1.5px solid rgba(var(--acc), 0.45); }
+  #eprev td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  #eprev img { max-width: 100%; border-radius: 8px; }
+
+  /* diálogo */
+  #dlg {
+    position: fixed; inset: 0; z-index: 20; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(5,5,10,0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  #dlg.on { display: flex; }
+  #dlg .box {
+    width: min(360px, calc(100vw - 48px));
+    background: var(--glass); border: 1px solid var(--line); border-radius: 18px; padding: 20px;
+  }
+  #dlg .t { font-weight: 800; font-size: 16px; margin-bottom: 8px; }
+  #dlg .m { font-size: 13px; color: var(--mut); line-height: 1.55; }
+  #dlg input {
+    width: 100%; margin-top: 12px; padding: 11px 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--ink);
+    font: 14px ui-monospace, monospace; outline: none;
+  }
+  #dlg .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  #dlg .err { color: #f87171; font-size: 12px; margin-top: 8px; }
+  .btn { border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--mut); border-radius: 10px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; }
+  .btn.pri { background: rgba(var(--acc), 0.2); border-color: rgba(var(--acc), 0.4); color: rgb(var(--soft)); }
+
+  /* seletor em lâmina (idiomas do Lab, mover nota, menu ⋯) */
+  #pick {
+    position: fixed; inset: 0; z-index: 22; display: none;
+    background: rgba(5,5,10,0.6);
+  }
+  #pick.on { display: block; }
+  #pick .sheet {
+    position: absolute; left: 10px; right: 10px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+    background: var(--glass); border: 1px solid var(--line); border-radius: 18px;
+    max-height: 60vh; overflow-y: auto;
+  }
+  #pick .ph {
+    padding: 12px 16px 6px; font-family: ui-monospace, monospace; font-size: 9.5px;
+    letter-spacing: 2.5px; color: rgba(var(--acc), 0.9);
+  }
+  #pick .pi { padding: 13px 16px; border-top: 1px solid var(--line); font-size: 14.5px; font-weight: 600; }
+  #pick .pi small { display: block; color: var(--mut); font-size: 11px; margin-top: 2px; font-family: ui-monospace, monospace; }
+  #pick .pi:active { background: rgba(var(--acc), 0.08); }
+  #pick .pi.dz { color: #f87171; }
+
+  #toast {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 78px);
+    background: var(--glass); border: 1px solid var(--line); border-radius: 999px;
+    padding: 9px 16px; font-size: 12.5px; color: var(--ink); z-index: 30;
+    opacity: 0; transition: opacity 0.25s; pointer-events: none;
+    max-width: calc(100vw - 40px); text-align: center;
+  }
+  #toast.on { opacity: 1; }
+  input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+
+<canvas id="sky"></canvas>
+
+<div id="hdr">
+  <div class="kind" id="ktitle">ESTAÇÃO COSMOS</div>
+  <div id="trail"></div>
+  <div class="census" id="census">—</div>
+</div>
+
+<div id="topbtns">
+  <button class="chip" id="b-portal" title="Criar portal">⊕</button>
+  <button class="chip" id="b-import" title="Importar notas/backup">⇘</button>
+  <button class="chip" id="b-backup" title="Backup completo">⛃</button>
+  <button class="chip" id="b-photo" title="Foto do céu">✦</button>
+</div>
+
+<div id="results"></div>
+
+<div id="bar">
+  <input id="q" type="search" placeholder="Boa tarde, Navegador — buscar ou criar..." autocomplete="off">
+  <button id="go">criar</button>
+</div>
+
+<!-- editor -->
+<div id="sheet">
+  <div id="ehdr">
+    <button class="ibtn" id="e-back">‹</button>
+    <div id="etitle"></div>
+    <button class="ibtn" id="e-lang" title="Laboratório de código">&lt;/&gt;</button>
+    <button class="ibtn" id="e-run" title="Executar (Ctrl+Enter)">▶</button>
+    <button class="ibtn" id="e-view" title="Ler/editar">👁</button>
+    <button class="ibtn" id="e-lock" title="Cofre">🔒</button>
+    <button class="ibtn" id="e-menu" title="Mais">⋯</button>
+  </div>
+  <div id="ebody">
+    <div id="ewrap">
+      <div id="hl" aria-hidden="true"></div>
+      <textarea id="eta" spellcheck="false" placeholder="Escreva, Navegador..."></textarea>
+    </div>
+    <div id="eprev"></div>
+    <div id="runpan">
+      <div id="runhdr">
+        <span id="runtitle">SAÍDA DO LAB</span>
+        <button class="rbtn" id="run-live">AO VIVO ○</button>
+        <button class="rbtn" id="run-close">✕</button>
+      </div>
+      <div id="runlog"></div>
+      <iframe id="runframe" sandbox="allow-scripts"></iframe>
+    </div>
+  </div>
+</div>
+
+<div id="dlg"><div class="box">
+  <div class="t"></div><div class="m"></div><div class="err"></div>
+  <input type="text" spellcheck="false" autocomplete="off">
+  <div class="acts"><button class="btn c">Cancelar</button><button class="btn pri ok">OK</button></div>
+</div></div>
+
+<div id="pick"><div class="sheet"><div class="ph"></div><div class="list"></div></div></div>
+
+<div id="toast"></div>
+<input type="file" id="fimp" accept=".md,.markdown,.txt,.js,.py,.html,.css,.json,.sql,.sh,.cosmosverse" multiple>
+
+<script>
+'use strict';
+/* ═══ COSMOS · ESTAÇÃO UNIVERSAL 1.4.0 "PULSO" — um arquivo, um cosmos ═══ */
+
+// ── Fases do dia: mesma alma do desktop (só as CORES mudam; o vácuo é eterno)
+const PHASES = [
+  { h: 0,    acc: [124,106,240], soft: [173,158,255], star: 1.0 },
+  { h: 5.5,  acc: [244,114,140], soft: [253,164,175], star: 0.55 },
+  { h: 9,    acc: [56,189,248],  soft: [147,197,253], star: 0.4 },
+  { h: 13.5, acc: [245,176,26],  soft: [253,211,92],  star: 0.4 },
+  { h: 17.5, acc: [251,113,133], soft: [253,164,175], star: 0.6 },
+  { h: 20.5, acc: [139,92,246],  soft: [167,139,250], star: 0.9 },
+];
+const GREET = h => h < 5.5 ? 'Boa madrugada' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+function phase() {
+  const h = new Date().getHours() + new Date().getMinutes() / 60;
+  let i = PHASES.length - 1;
+  for (let k = 0; k < PHASES.length; k++) if (h >= PHASES[k].h) i = k;
+  const a = PHASES[i], b = PHASES[(i + 1) % PHASES.length];
+  const span = (b.h > a.h ? b.h : b.h + 24) - a.h;
+  const t = Math.min(1, Math.max(0, (h - a.h) / span));
+  const mix = (u, v) => u.map((x, j) => Math.round(x + (v[j] - x) * t));
+  return { acc: mix(a.acc, b.acc), soft: mix(a.soft, b.soft), star: a.star + (b.star - a.star) * t };
+}
+function applyPhase() {
+  const p = phase();
+  document.documentElement.style.setProperty('--acc', p.acc.join(','));
+  document.documentElement.style.setProperty('--soft', p.soft.join(','));
+  document.getElementById('q').placeholder = `${GREET(new Date().getHours())}, Navegador — buscar ou criar...`;
+  return p;
+}
+
+// ── localStorage seguro (alguns navegadores negam em file://)
+const LS = {
+  get(k) { try { return localStorage.getItem(k); } catch { return LS._m?.[k] ?? null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { (LS._m = LS._m || {})[k] = v; } },
+};
+
+// ── Banco local (IndexedDB): notas e portais moram no aparelho, e só nele
+const DB = { _db: null, _mem: null };
+DB.open = () => new Promise(ok => {
+  let r;
+  try { r = indexedDB.open('cosmos-mobile', 2); }
+  catch { DB._mem = { notes: new Map(), spaces: new Map() }; return ok(); }
+  r.onupgradeneeded = () => {
+    const db = r.result;
+    if (!db.objectStoreNames.contains('notes')) db.createObjectStore('notes', { keyPath: 'id' });
+    if (!db.objectStoreNames.contains('spaces')) db.createObjectStore('spaces', { keyPath: 'path' });
+  };
+  r.onsuccess = () => { DB._db = r.result; ok(); };
+  r.onerror = () => { DB._mem = { notes: new Map(), spaces: new Map() }; ok(); };
+});
+DB._all = store => new Promise(ok => {
+  if (DB._mem) return ok([...DB._mem[store].values()]);
+  const out = [];
+  const c = DB._db.transaction(store).objectStore(store).openCursor();
+  c.onsuccess = () => {
+    if (c.result) { out.push(c.result.value); c.result.continue(); }
+    else ok(out);
+  };
+});
+DB.all = () => DB._all('notes').then(ns => ns.sort((a, b) => b.updated - a.updated));
+DB.put = n => new Promise(ok => {
+  if (DB._mem) { DB._mem.notes.set(n.id, n); return ok(); }
+  DB._db.transaction('notes', 'readwrite').objectStore('notes').put(n).onsuccess = ok;
+});
+DB.del = id => new Promise(ok => {
+  if (DB._mem) { DB._mem.notes.delete(id); return ok(); }
+  DB._db.transaction('notes', 'readwrite').objectStore('notes').delete(id).onsuccess = ok;
+});
+DB.spaces = () => DB._all('spaces').then(ss => ss.sort((a, b) => a.path.localeCompare(b.path)));
+DB.putSpace = s => new Promise(ok => {
+  if (DB._mem) { DB._mem.spaces.set(s.path, s); return ok(); }
+  DB._db.transaction('spaces', 'readwrite').objectStore('spaces').put(s).onsuccess = ok;
+});
+DB.delSpace = path => new Promise(ok => {
+  if (DB._mem) { DB._mem.spaces.delete(path); return ok(); }
+  DB._db.transaction('spaces', 'readwrite').objectStore('spaces').delete(path).onsuccess = ok;
+});
+
+// ── Cofre (WebCrypto): frase → PBKDF2 600k → AES-256-GCM.
+//    (a web não tem scrypt nativo — 600 mil iterações é o padrão OWASP)
+const Vault = {
+  key: null, timer: null,
+  saltB64() {
+    let s = LS.get('cosmos.salt');
+    if (!s) {
+      const b = crypto.getRandomValues(new Uint8Array(16));
+      s = btoa(String.fromCharCode(...b));
+      LS.set('cosmos.salt', s);
+    }
+    return s;
+  },
+  async derive(phrase) {
+    const norm = phrase.trim().toLowerCase().normalize('NFC').replace(/\s+/g, ' ');
+    if (norm.split(' ').length < 4) throw new Error('use pelo menos 4 palavras');
+    const salt = Uint8Array.from(atob(this.saltB64()), c => c.charCodeAt(0));
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(norm), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' },
+      base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  },
+  touch() {
+    clearTimeout(this.timer);
+    if (this.key) this.timer = setTimeout(() => { this.key = null; }, 15 * 60 * 1000);
+  },
+  async setup(phrase) {
+    this.key = await this.derive(phrase);
+    const v = await this.enc('cosmos-ok');
+    LS.set('cosmos.verifier', JSON.stringify(v));
+    this.touch();
+  },
+  configured() { return !!LS.get('cosmos.verifier'); },
+  async unlock(phrase) {
+    try {
+      const k = await this.derive(phrase);
+      const v = JSON.parse(LS.get('cosmos.verifier'));
+      const old = this.key; this.key = k;
+      const pt = await this.dec(v);
+      if (pt !== 'cosmos-ok') { this.key = old; return false; }
+      this.touch(); return true;
+    } catch { return false; }
+  },
+  async enc(text) {
+    this.touch();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, this.key, new TextEncoder().encode(text));
+    const b = u => btoa(String.fromCharCode(...new Uint8Array(u)));
+    return { iv: b(iv), ct: b(ct) };
+  },
+  async dec(box) {
+    this.touch();
+    const u = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: u(box.iv) }, this.key, u(box.ct));
+    return new TextDecoder().decode(pt);
+  },
+};
+
+// ── Laboratório: destaque de sintaxe vivo (regex por linguagem, zero dependências)
+const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const SYN = {};
+function defLang(name, parts, flags = 'gm') {
+  SYN[name] = { re: new RegExp(parts.map(p => '(' + p[0] + ')').join('|'), flags), cls: parts.map(p => p[1]) };
+}
+defLang('js', [
+  ['\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/', 'cmt'],
+  ["'(?:[^'\\\\\\n]|\\\\.)*'|\"(?:[^\"\\\\\\n]|\\\\.)*\"|`(?:[^`\\\\]|\\\\.)*`", 'str'],
+  ['\\b0x[\\da-fA-F]+\\b|\\b\\d+(?:\\.\\d+)?\\b', 'num'],
+  ['\\b(?:const|let|var|function|return|if|else|for|while|do|class|new|await|async|import|export|from|try|catch|finally|throw|typeof|instanceof|of|in|switch|case|break|continue|default|yield|delete|void|this|super|extends|static|null|undefined|true|false)\\b', 'kw'],
+  ['\\b[A-Za-z_$][\\w$]*(?=\\s*\\()', 'fn'],
+]);
+defLang('py', [
+  ['#[^\\n]*', 'cmt'],
+  ["'''[\\s\\S]*?'''|\"\"\"[\\s\\S]*?\"\"\"|'(?:[^'\\\\\\n]|\\\\.)*'|\"(?:[^\"\\\\\\n]|\\\\.)*\"", 'str'],
+  ['\\b\\d+(?:\\.\\d+)?\\b', 'num'],
+  ['\\b(?:def|return|if|elif|else|for|while|import|from|as|class|try|except|finally|raise|with|lambda|pass|break|continue|global|nonlocal|yield|assert|del|not|and|or|is|in|None|True|False|self|print|range|len|str|int|float|list|dict|set|tuple)\\b', 'kw'],
+  ['\\b[A-Za-z_][\\w]*(?=\\s*\\()', 'fn'],
+]);
+defLang('html', [
+  ['<!--[\\s\\S]*?-->', 'cmt'],
+  ['"[^"]*"|\'[^\']*\'', 'str'],
+  ['<\\/?[a-zA-Z][\\w-]*|\\/?>', 'tag'],
+  ['\\b[a-zA-Z-]+(?==)', 'attr'],
+]);
+defLang('css', [
+  ['\\/\\*[\\s\\S]*?\\*\\/', 'cmt'],
+  ['"[^"]*"|\'[^\']*\'', 'str'],
+  ['#[0-9a-fA-F]{3,8}\\b|\\b\\d+(?:\\.\\d+)?(?:px|em|rem|%|vh|vw|s|ms|fr|deg)?\\b', 'num'],
+  ['@[\\w-]+', 'kw'],
+  ['[\\w-]+(?=\\s*:)', 'attr'],
+]);
+defLang('json', [
+  ['"(?:[^"\\\\]|\\\\.)*"(?=\\s*:)', 'attr'],
+  ['"(?:[^"\\\\]|\\\\.)*"', 'str'],
+  ['-?\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b', 'num'],
+  ['\\b(?:true|false|null)\\b', 'kw'],
+]);
+defLang('sql', [
+  ['--[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/', 'cmt'],
+  ["'(?:[^'\\\\\\n]|\\\\.)*'", 'str'],
+  ['\\b\\d+(?:\\.\\d+)?\\b', 'num'],
+  ['\\b(?:select|from|where|insert|into|values|update|set|delete|join|left|right|inner|outer|on|group|by|order|having|limit|create|table|primary|key|not|null|and|or|as|distinct|count|sum|avg|min|max|like|in|between|union|alter|drop|index|desc|asc)\\b', 'kw'],
+], 'gmi');
+defLang('sh', [
+  ['#[^\\n]*', 'cmt'],
+  ['"(?:[^"\\\\]|\\\\.)*"|\'[^\']*\'', 'str'],
+  ['\\$\\{?\\w+\\}?', 'num'],
+  ['\\b(?:if|then|else|elif|fi|for|in|do|done|while|case|esac|function|echo|cd|ls|cat|grep|export|return|exit|local|read|sudo|curl|mkdir|rm|cp|mv)\\b', 'kw'],
+]);
+function highlight(src, lang) {
+  const d = SYN[lang];
+  if (!d) return esc(src);
+  const re = d.re; re.lastIndex = 0;
+  let out = '', last = 0, m;
+  while ((m = re.exec(src))) {
+    out += esc(src.slice(last, m.index));
+    const gi = m.slice(1).findIndex(g => g !== undefined);
+    out += `<span class="tk-${d.cls[gi]}">${esc(m[0])}</span>`;
+    last = m.index + m[0].length;
+    if (m[0].length === 0) re.lastIndex++;
+  }
+  return out + esc(src.slice(last));
+}
+const LANGS = [
+  { value: 'md',   label: 'Markdown',   sub: 'texto, tarefas, tabelas — modo padrão' },
+  { value: 'js',   label: 'JavaScript', sub: 'destaque vivo · executa no aparelho ▶ · AO VIVO' },
+  { value: 'html', label: 'HTML',       sub: 'destaque vivo · renderiza enquanto digita ▶' },
+  { value: 'py',   label: 'Python',     sub: 'destaque vivo (execução: só JS/HTML)' },
+  { value: 'css',  label: 'CSS',        sub: 'destaque vivo' },
+  { value: 'json', label: 'JSON',       sub: 'destaque vivo' },
+  { value: 'sql',  label: 'SQL',        sub: 'destaque vivo' },
+  { value: 'sh',   label: 'Shell',      sub: 'destaque vivo' },
+];
+const EXT = { md: 'md', js: 'js', py: 'py', html: 'html', css: 'css', json: 'json', sql: 'sql', sh: 'sh' };
+const EXT2LANG = {
+  md: 'md', markdown: 'md', txt: 'md',
+  js: 'js', javascript: 'js', mjs: 'js', node: 'js', ts: 'js',
+  py: 'py', python: 'py',
+  html: 'html', htm: 'html', css: 'css', json: 'json', sql: 'sql',
+  sh: 'sh', bash: 'sh', zsh: 'sh', shell: 'sh',
+};
+
+// ── Markdown (port compacto do motor do desktop; código cercado ganha destaque)
+function md(src) {
+  if (!src) return '';
+  src = src.replace(/^---\n[\s\S]*?\n---\n?/, '').replace(/\r\n/g, '\n');
+  const inline = t => {
+    const codes = [];
+    t = t.replace(/`([^`]+)`/g, (_, c) => { codes.push(`<code>${esc(c)}</code>`); return `\x00${codes.length - 1}\x00`; });
+    t = t.replace(/\[\[([^\]]+)\]\]/g, (_, l) => `<a data-note="${esc(l.trim())}">${esc(l.trim().replace(/\.md$/, ''))}</a>`);
+    t = t.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+    t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    t = t.replace(/\*{3}(.+?)\*{3}/g, '<strong><em>$1</em></strong>')
+         .replace(/\*{2}(.+?)\*{2}/g, '<strong>$1</strong>')
+         .replace(/(?<!\w)\*(.+?)\*(?!\w)/g, '<em>$1</em>')
+         .replace(/~~(.+?)~~/g, '<del>$1</del>')
+         .replace(/==(.+?)==/g, '<mark>$1</mark>');
+    return t.replace(/\x00(\d+)\x00/g, (_, i) => codes[+i]);
+  };
+  const L = src.split('\n');
+  let h = '', i = 0;
+  const isBlock = l => /^#{1,6}\s|^`{3,}|^>\s?|^\s*[-*+]\s|^\s*\d+\.\s|^\|(.+)\|\s*$/.test(l);
+  while (i < L.length) {
+    const l = L[i];
+    let m;
+    if ((m = l.match(/^`{3,}\s*(\w*)/))) {
+      const cs = []; i++;
+      while (i < L.length && !/^`{3,}\s*$/.test(L[i])) cs.push(L[i++]);
+      i++;
+      const lang = EXT2LANG[m[1].toLowerCase()] || m[1].toLowerCase();
+      h += `<pre><code>${SYN[lang] ? highlight(cs.join('\n'), lang) : esc(cs.join('\n'))}</code></pre>`;
+    } else if ((m = l.match(/^(#{1,6})\s+(.+)/))) {
+      h += `<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`; i++;
+    } else if (/^>\s?/.test(l)) {
+      const qs = [];
+      while (i < L.length && /^>\s?/.test(L[i])) qs.push(L[i++].replace(/^>\s?/, ''));
+      h += `<blockquote>${md(qs.join('\n'))}</blockquote>`;
+    } else if (/^\|(.+)\|\s*$/.test(l) && i + 1 < L.length && /^\|[\s:|-]+\|\s*$/.test(L[i + 1])) {
+      const cells = s => s.trim().replace(/^\||\|$/g, '').split('|').map(c => inline(c.trim()));
+      const head = cells(l); i += 2;
+      let rows = '';
+      while (i < L.length && /^\|(.+)\|\s*$/.test(L[i])) rows += `<tr>${cells(L[i++]).map(c => `<td>${c}</td>`).join('')}</tr>`;
+      h += `<table><thead><tr>${head.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
+    } else if (/^\s*[-*+]\s/.test(l)) {
+      h += '<ul>';
+      while (i < L.length && /^\s*[-*+]\s/.test(L[i])) {
+        const it = L[i].replace(/^\s*[-*+]\s/, '');
+        const cb = it.match(/^\[([ xX/]?)\]\s*(.*)/);
+        if (cb) {
+          const done = cb[1] && cb[1] !== ' ' && cb[1] !== '/';
+          h += `<li class="task">${done ? '✅' : cb[1] === '/' ? '🔶' : '⬜'} ${inline(cb[2])}</li>`;
+        } else h += `<li>${inline(it)}</li>`;
+        i++;
+      }
+      h += '</ul>';
+    } else if (/^\s*\d+\.\s/.test(l)) {
+      h += '<ol>';
+      while (i < L.length && /^\s*\d+\.\s/.test(L[i])) h += `<li>${inline(L[i++].replace(/^\s*\d+\.\s/, ''))}</li>`;
+      h += '</ol>';
+    } else if (l.trim() === '') { i++; }
+    else {
+      const ps = [];
+      while (i < L.length && L[i].trim() !== '' && !isBlock(L[i])) ps.push(L[i++]);
+      h += `<p>${inline(ps.join('\n')).replace(/\n/g, '<br>')}</p>`;
+    }
+  }
+  return h;
+}
+
+// ── Multiverso: espaços com nome de profundidade (a cartografia do desktop)
+const DEPTH  = ['UNIVERSO', 'GALÁXIA', 'SISTEMA', 'SETOR'];
+const DEPTHP = ['UNIVERSOS', 'GALÁXIAS', 'SISTEMAS', 'SETORES'];
+const parentOf = p => p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '';
+const lastSeg  = p => p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
+const kindIdx  = p => Math.min(p.split('/').length - 1, 3); // 'A'→0 universo, 'A/B'→1 galáxia...
+
+// ── Estado + céu
+let notes = [], spacesArr = [], cur = '', current = null, saveTimer = null;
+const $ = id => document.getElementById(id);
+const HUES = new Map();
+const hueOf = name => {
+  let h = HUES.get(name);
+  if (h === undefined) {
+    h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    h %= 360;
+    if (HUES.size > 500) HUES.clear();
+    HUES.set(name, h);
+  }
+  return h;
+};
+const hue  = (name, l = 62) => `hsl(${hueOf(name)} 62% ${l}%)`;
+const hueA = (name, a, l = 62) => `hsl(${hueOf(name)} 62% ${l}% / ${a})`;
+const titleOf = n => n.locked ? `🔒 ${n.title}` : ((n.lang && n.lang !== 'md') ? n.title : ((n.content.match(/^#\s+(.+)/m) || [])[1] || n.title));
+const noteSpace = n => n.space || '';
+const childSpaces = base => spacesArr.filter(s => parentOf(s.path) === base && s.path !== '');
+const localNotes  = base => notes.filter(n => noteSpace(n) === base);
+
+const sky = $('sky'), ctx = sky.getContext('2d');
+let T = 0, starLayers = null;
+const DPR = () => Math.min(2, devicePixelRatio || 1);
+function fit() {
+  const dpr = DPR();
+  sky.width = innerWidth * dpr; sky.height = innerHeight * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  starLayers = null;
+}
+addEventListener('resize', fit);
+
+// ── Sprites: desenhar UMA vez, carimbar sempre — a chave da fluidez.
+//    (gradientes e texto por quadro eram o que travava; agora é só drawImage)
+const SPR = new Map();
+function sprite(key, w, h, paint) {
+  let s = SPR.get(key);
+  if (!s) {
+    if (SPR.size > 300) SPR.clear();
+    const cv = document.createElement('canvas');
+    const d = DPR();
+    cv.width = Math.ceil(w * d); cv.height = Math.ceil(h * d);
+    const c = cv.getContext('2d');
+    c.scale(d, d);
+    paint(c, w, h);
+    s = { cv, w, h };
+    SPR.set(key, s);
+  }
+  return s;
+}
+function stamp(s, x, y) { ctx.drawImage(s.cv, x - s.w / 2, y - s.h / 2, s.w, s.h); }
+
+function noteSprite(n) {
+  const t = titleOf(n);
+  const label = t.length > 16 ? t.slice(0, 15) + '…' : t;
+  const r = n.locked ? 7 : 8;
+  const isCode = !n.locked && n.lang && n.lang !== 'md';
+  return sprite(`n|${label}|${r}|${n.locked ? 1 : 0}|${isCode ? 1 : 0}`, 116, 112, (c, w, h) => {
+    const x = w / 2, y = h / 2, base = t.replace(/^🔒 /, '');
+    const halo = c.createRadialGradient(x, y, 1, x, y, r * 3);
+    halo.addColorStop(0, hueA(base, 0.35)); halo.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = halo; c.beginPath(); c.arc(x, y, r * 3, 0, 7); c.fill();
+    const body = c.createRadialGradient(x - 2, y - 3, 1, x, y, r);
+    body.addColorStop(0, '#fff'); body.addColorStop(0.35, hue(base)); body.addColorStop(1, 'rgba(10,10,18,0.9)');
+    c.fillStyle = body; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+    c.textAlign = 'center';
+    if (n.locked) { c.font = '8px sans-serif'; c.fillText('🔒', x, y + 3); }
+    else if (isCode) {
+      c.font = '700 7px ui-monospace, monospace';
+      c.fillStyle = 'rgba(10,10,16,0.85)';
+      c.fillText('</>', x, y + 2.5);
+    }
+    c.font = '600 10px -apple-system, sans-serif';
+    c.fillStyle = 'rgba(220,220,235,0.85)';
+    c.fillText(label, x, y + r + 13);
+  });
+}
+
+// base do portal (tudo menos as partes que se mexem)
+function portalSprite(path, count, r) {
+  const name = lastSeg(path);
+  const k = kindIdx(path);
+  const label = (name.length > 14 ? name.slice(0, 13) + '…' : name).toUpperCase();
+  return sprite(`p|${k}|${label}|${count}|${r}`, 150, 120, (c, w, h) => {
+    const x = w / 2, y = h / 2;
+    const halo = c.createRadialGradient(x, y, 1, x, y, r * 3.1);
+    halo.addColorStop(0, hueA(name, 0.32)); halo.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = halo; c.beginPath(); c.arc(x, y, r * 3.1, 0, 7); c.fill();
+    if (k === 1) {
+      // GALÁXIA: só o núcleo aqui — os braços giram em sprite próprio
+      const core = c.createRadialGradient(x, y, 0, x, y, 5);
+      core.addColorStop(0, '#fff'); core.addColorStop(1, hueA(name, 0));
+      c.fillStyle = core; c.beginPath(); c.arc(x, y, 5, 0, 7); c.fill();
+    } else {
+      const body = c.createRadialGradient(x - 3, y - 4, 1, x, y, r * 0.82);
+      body.addColorStop(0, '#fff'); body.addColorStop(0.4, hue(name)); body.addColorStop(1, 'rgba(10,10,18,0.92)');
+      c.fillStyle = body; c.beginPath(); c.arc(x, y, r * 0.82, 0, 7); c.fill();
+      c.strokeStyle = hueA(name, 0.8);
+      c.lineWidth = 1.3;
+      if (k === 0) {
+        c.beginPath(); c.ellipse(x, y, r * 1.75, r * 0.55, -0.42, 0, 7); c.stroke();
+        c.strokeStyle = hueA(name, 0.45);
+        c.beginPath(); c.ellipse(x, y, r * 2.15, r * 0.72, -0.42, 0, 7); c.stroke();
+      } else if (k === 2) {
+        c.strokeStyle = hueA(name, 0.4);
+        c.beginPath(); c.ellipse(x, y, r * 1.7, r * 1.7 * 0.6, 0, 0, 7); c.stroke();
+      } else {
+        c.beginPath(); c.ellipse(x, y, r * 1.55, r * 0.5, -0.42, 0, 7); c.stroke();
+      }
+    }
+    c.textAlign = 'center';
+    c.font = '700 7.5px ui-monospace, monospace';
+    c.fillStyle = 'rgba(200,200,220,0.55)';
+    c.fillText(`${DEPTH[k]} · ${count}`, x, y - r - 10);
+    c.font = '600 10.5px ui-monospace, monospace';
+    c.fillStyle = hueA(name, 0.95, 72);
+    c.fillText(label, x, y + r + 16);
+  });
+}
+// braços da galáxia: sprite circular que gira; a elipse vem do scale no carimbo
+function galaxyArms(name, r) {
+  return sprite(`g|${hueOf(name)}|${r}`, r * 4, r * 4, (c, w, h) => {
+    const x = w / 2, y = h / 2;
+    for (let arm = 0; arm < 2; arm++) {
+      for (let t = 0; t < 1; t += 0.07) {
+        const rr = 2.5 + t * r * 1.55;
+        const an = arm * Math.PI + t * 4.4;
+        c.fillStyle = hueA(name, 0.85 - t * 0.62, 68);
+        c.beginPath();
+        c.arc(x + Math.cos(an) * rr, y + Math.sin(an) * rr, 1.7 - t * 0.8, 0, 7);
+        c.fill();
+      }
+    }
+  });
+}
+function sunSprite(P, name, hint) {
+  const label = name.length > 14 ? name.slice(0, 13) + '…' : name;
+  return sprite(`s|${P.acc.join()}|${label}|${hint ? 1 : 0}`, 150, 160, (c, w, h) => {
+    const x = w / 2, y = h / 2 - 10, sunR = 17;
+    const g = c.createRadialGradient(x, y, 2, x, y, sunR * 3.4);
+    g.addColorStop(0, `rgba(${P.acc.join(',')},0.5)`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, sunR * 3.4, 0, 7); c.fill();
+    const b = c.createRadialGradient(x - 5, y - 6, 2, x, y, sunR);
+    b.addColorStop(0, '#fff'); b.addColorStop(0.6, `rgb(${P.soft.join(',')})`); b.addColorStop(1, `rgb(${P.acc.join(',')})`);
+    c.fillStyle = b; c.beginPath(); c.arc(x, y, sunR, 0, 7); c.fill();
+    c.font = '700 10px ui-monospace, monospace'; c.textAlign = 'center';
+    c.fillStyle = 'rgba(255,255,255,0.8)';
+    c.fillText(label, x, y + sunR + 16);
+    if (hint) {
+      c.font = '700 7.5px ui-monospace, monospace';
+      c.fillStyle = 'rgba(200,200,220,0.5)';
+      c.fillText('· TOQUE PARA SUBIR ·', x, y + sunR + 28);
+    }
+  });
+}
+// céu estrelado: 3 camadas fixas; o brilho pulsa via globalAlpha (nada é redesenhado)
+function makeStars() {
+  if (!sky.width || !sky.height) { starLayers = null; return; }
+  const dpr = DPR();
+  starLayers = [0, 1, 2].map(li => {
+    const cv = document.createElement('canvas');
+    cv.width = sky.width; cv.height = sky.height;
+    const c = cv.getContext('2d');
+    c.scale(dpr, dpr);
+    c.fillStyle = '#fff';
+    for (let i = li; i < 70; i += 3) {
+      const s = 0.5 + ((i * 2654435761) % 100) / 100;
+      c.fillRect(((i * 40503) % 997) / 997 * innerWidth, ((i * 69857) % 991) / 991 * innerHeight, s, s);
+    }
+    return cv;
+  });
+}
+
+// portais primeiro (anel de dentro), planetas depois
+function layout() {
+  const cx = innerWidth / 2, cy = innerHeight / 2 - 20;
+  const maxR = Math.min(innerWidth, innerHeight) * 0.42;
+  const items = [
+    ...childSpaces(cur).map(s => ({ type: 'portal', s })),
+    ...localNotes(cur).map(n => ({ type: 'note', n })),
+  ];
+  return items.map((it, i) => {
+    const ring = Math.floor(i / 8);
+    const R = 84 + ring * Math.min(58, (maxR - 84) / 3);
+    const th = (i % 8) / 8 * Math.PI * 2 + ring * 0.5 + T * (0.0018 - ring * 0.0004);
+    return { ...it, x: cx + Math.cos(th) * R, y: cy + Math.sin(th) * R * 0.94, r: it.type === 'portal' ? 12 : (it.n.locked ? 7 : 8) };
+  });
+}
+let bodies = [];
+
+// cometa raro: atravessa o céu de tempos em tempos (o cosmos está vivo)
+let comet = null;
+function drawComet() {
+  if (!comet && Math.random() < 0.0011) {
+    const fromLeft = Math.random() < 0.5;
+    comet = {
+      x: fromLeft ? -40 : innerWidth + 40,
+      y: Math.random() * innerHeight * 0.45,
+      vx: (fromLeft ? 1 : -1) * (4 + Math.random() * 3),
+      vy: 1 + Math.random() * 1.6,
+    };
+  }
+  if (!comet) return;
+  comet.x += comet.vx; comet.y += comet.vy;
+  const tx = comet.x - comet.vx * 13, ty = comet.y - comet.vy * 13;
+  const g = ctx.createLinearGradient(tx, ty, comet.x, comet.y);
+  g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,255,255,0.7)');
+  ctx.strokeStyle = g; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(comet.x, comet.y); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath(); ctx.arc(comet.x, comet.y, 1.6, 0, 7); ctx.fill();
+  if (comet.x < -60 || comet.x > innerWidth + 60 || comet.y > innerHeight + 60) comet = null;
+}
+
+function draw() {
+  if (!innerWidth || !innerHeight) return;
+  if (!sky.width || !sky.height) fit();
+  const P = applyPhase.p || (applyPhase.p = applyPhase());
+  if (T % 600 === 0) applyPhase.p = applyPhase();
+  ctx.clearRect(0, 0, innerWidth, innerHeight);
+
+  // estrelas eternas (3 carimbadas, brilho pulsante)
+  if (!starLayers || starLayers[0].width !== sky.width || starLayers[0].height !== sky.height) makeStars();
+  if (starLayers) {
+    for (let li = 0; li < 3; li++) {
+      ctx.globalAlpha = Math.max(0.05, (0.25 + 0.3 * Math.sin(T * 0.02 + li * 2.1)) * P.star);
+      ctx.drawImage(starLayers[li], 0, 0, innerWidth, innerHeight);
+    }
+  }
+  ctx.globalAlpha = 1;
+  drawComet();
+
+  const cx = innerWidth / 2, cy = innerHeight / 2 - 20;
+  bodies = layout();
+
+  // órbitas finas
+  ctx.strokeStyle = 'rgba(255,255,255,0.045)';
+  ctx.lineWidth = 1;
+  for (let ring = 0; ring < Math.ceil(bodies.length / 8); ring++) {
+    const R = 84 + ring * Math.min(58, (Math.min(innerWidth, innerHeight) * 0.42 - 84) / 3);
+    ctx.beginPath(); ctx.ellipse(cx, cy, R, R * 0.94, 0, 0, 7); ctx.stroke();
+  }
+
+  // o sol é VOCÊ (na raiz) ou o coração do espaço atual
+  const sunName = cur === '' ? 'VOCÊ' : lastSeg(cur).toUpperCase();
+  stamp(sunSprite(P, sunName, cur !== ''), cx, cy + 10);
+
+  // espaço vazio: convite, não deserto
+  if (bodies.length === 0) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.setLineDash([3, 7]);
+    ctx.beginPath(); ctx.ellipse(cx, cy, 84, 84 * 0.94, 0, 0, 7); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = '600 10px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(200,200,220,0.45)';
+    ctx.fillText('ESPAÇO VAZIO — CRIE ALGO ABAIXO', cx, cy - 100);
+  }
+
+  for (const p of bodies) {
+    if (p.type === 'portal') {
+      const name = lastSeg(p.s.path);
+      const k = kindIdx(p.s.path);
+      const count = childSpaces(p.s.path).length + localNotes(p.s.path).length;
+      stamp(portalSprite(p.s.path, count, p.r), p.x, p.y);
+      if (k === 1) {
+        // braços girando: rotação no espaço redondo, achatamento no carimbo
+        const g = galaxyArms(name, p.r);
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.scale(1, 0.62);
+        ctx.rotate(T * 0.008);
+        ctx.drawImage(g.cv, -g.w / 2, -g.h / 2, g.w, g.h);
+        ctx.restore();
+      } else if (k === 2) {
+        // luas vivas do sistema
+        for (let mo = 0; mo < 2; mo++) {
+          const an = T * 0.02 + mo * Math.PI;
+          ctx.fillStyle = hueA(name, 0.95, 74);
+          ctx.beginPath();
+          ctx.arc(p.x + Math.cos(an) * p.r * 1.7, p.y + Math.sin(an) * p.r * 1.7 * 0.6, 2.1, 0, 7);
+          ctx.fill();
+        }
+      }
+    } else {
+      stamp(noteSprite(p.n), p.x, p.y);
+    }
+  }
+}
+
+// pulso da Estação: 30fps bastam para órbitas — metade da energia;
+// e quando o céu está coberto (editor/diálogo) ou a aba dorme, nada roda
+let flip = false;
+function sleeping() {
+  return document.hidden
+    || $('sheet').classList.contains('on')
+    || $('dlg').classList.contains('on')
+    || $('pick').classList.contains('on');
+}
+function loop() {
+  requestAnimationFrame(loop);
+  if (sleeping()) return;
+  flip = !flip;
+  if (flip) return;
+  T += 2;
+  draw();
+}
+// ao acordar a aba ou mudar de tamanho, o céu volta na hora — sem esperar o pulso
+addEventListener('visibilitychange', () => { if (!document.hidden) { T += 2; draw(); } });
+addEventListener('resize', () => { T += 2; draw(); });
+
+// ── Navegação do multiverso
+function warpTo(space, up = false) {
+  sky.classList.remove('warp', 'up');
+  void sky.offsetWidth; // reinicia a animação
+  if (up) sky.classList.add('up');
+  sky.classList.add('warp');
+  setTimeout(() => { cur = space; LS.set('cosmos.space', cur); renderStation(); T += 2; draw(); }, 230);
+  setTimeout(() => sky.classList.remove('warp', 'up'), 520);
+}
+function renderStation() {
+  const kt = $('ktitle'), tr = $('trail');
+  if (cur === '') {
+    kt.textContent = 'ESTAÇÃO COSMOS';
+    tr.classList.remove('on'); tr.innerHTML = '';
+  } else {
+    kt.textContent = `${DEPTH[kindIdx(cur)]} · ${lastSeg(cur).toUpperCase()}`;
+    tr.innerHTML = '';
+    const root = document.createElement('span');
+    root.className = 'seg'; root.textContent = '🌌'; root.dataset.path = '';
+    tr.appendChild(root);
+    const parts = cur.split('/');
+    parts.forEach((seg, i) => {
+      const sep = document.createElement('span'); sep.className = 'sep'; sep.textContent = '›';
+      tr.appendChild(sep);
+      const el = document.createElement('span');
+      el.className = 'seg' + (i === parts.length - 1 ? ' here' : '');
+      el.textContent = seg;
+      el.dataset.path = parts.slice(0, i + 1).join('/');
+      tr.appendChild(el);
+    });
+    tr.classList.add('on');
+  }
+  // censo local: portais por tipo + planetas + missões
+  const ports = childSpaces(cur), locals = localNotes(cur);
+  const byKind = {};
+  for (const s of ports) { const k = kindIdx(s.path); byKind[k] = (byKind[k] || 0) + 1; }
+  const parts = Object.keys(byKind).sort().map(k => `${byKind[k]} ${byKind[k] === 1 ? DEPTH[k] : DEPTHP[k]}`);
+  parts.push(`${locals.length} PLANETA${locals.length === 1 ? '' : 'S'}`);
+  const tasks = locals.filter(n => !n.locked).flatMap(n => n.content.match(/^\s*[-*+]\s+\[[ /]\]/gm) || []).length;
+  if (tasks) parts.push(`${tasks} ${tasks === 1 ? 'MISSÃO ABERTA' : 'MISSÕES ABERTAS'}`);
+  $('census').textContent = parts.join(' · ');
+}
+$('trail').addEventListener('click', e => {
+  const seg = e.target.closest('.seg');
+  if (seg && seg.dataset.path !== undefined && seg.dataset.path !== cur) warpTo(seg.dataset.path, true);
+});
+
+// toque no céu: portal mergulha, planeta abre, sol sobe
+let pressXY = null, longFired = false;
+sky.addEventListener('pointerdown', e => {
+  pressXY = [e.clientX, e.clientY]; longFired = false;
+  const hit = bodies.find(p => p.type === 'portal' && Math.hypot(e.clientX - p.x, e.clientY - p.y) < p.r + 18);
+  if (hit) {
+    sky._lp = setTimeout(async () => {
+      longFired = true;
+      if (navigator.vibrate) navigator.vibrate(18);
+      const ok = await dialog({
+        title: `Desfazer portal “${lastSeg(hit.s.path)}”?`,
+        msg: 'O portal se desfaz; tudo o que havia dentro sobe um nível. Nenhuma nota é apagada.',
+        input: false, ok: 'Desfazer',
+      });
+      if (ok) await dissolveSpace(hit.s.path);
+    }, 550);
+  }
+});
+sky.addEventListener('pointermove', e => {
+  if (pressXY && Math.hypot(e.clientX - pressXY[0], e.clientY - pressXY[1]) > 12) clearTimeout(sky._lp);
+});
+sky.addEventListener('pointerup', () => clearTimeout(sky._lp));
+sky.addEventListener('click', e => {
+  if (longFired) return;
+  for (const p of bodies) {
+    if (Math.hypot(e.clientX - p.x, e.clientY - p.y) < p.r + 16) {
+      if (p.type === 'portal') return warpTo(p.s.path);
+      return openNote(p.n);
+    }
+  }
+  const cx = innerWidth / 2, cy = innerHeight / 2 - 20;
+  if (cur !== '' && Math.hypot(e.clientX - cx, e.clientY - cy) < 40) warpTo(parentOf(cur), true);
+});
+
+async function dissolveSpace(path) {
+  const par = parentOf(path);
+  const remap = p => p === path ? par : p.startsWith(path + '/') ? (par ? par + '/' : '') + p.slice(path.length + 1) : p;
+  for (const s of [...spacesArr]) {
+    if (s.path === path) await DB.delSpace(s.path);
+    else if (s.path.startsWith(path + '/')) { await DB.delSpace(s.path); await DB.putSpace({ path: remap(s.path) }); }
+  }
+  for (const n of notes) {
+    const sp = noteSpace(n);
+    if (sp === path || sp.startsWith(path + '/')) await DB.put({ ...n, space: remap(sp) });
+  }
+  if (cur === path || cur.startsWith(path + '/')) cur = par;
+  await refresh();
+  toast('portal desfeito — nada se perdeu');
+}
+
+// ── UI helpers
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 2600);
+}
+function dialog({ title, msg, input = true, ok = 'OK', error = '' }) {
+  return new Promise(res => {
+    const d = $('dlg');
+    d.querySelector('.t').textContent = title;
+    d.querySelector('.m').textContent = msg;
+    d.querySelector('.err').textContent = error;
+    const inp = d.querySelector('input');
+    inp.style.display = input ? '' : 'none'; inp.value = '';
+    d.querySelector('.ok').textContent = ok;
+    d.classList.add('on');
+    const done = v => { d.classList.remove('on'); res(v); };
+    d.querySelector('.ok').onclick = () => done(input ? inp.value : true);
+    d.querySelector('.c').onclick = () => done(null);
+    inp.onkeydown = e => { if (e.key === 'Enter') done(inp.value); };
+    if (input) setTimeout(() => inp.focus(), 80);
+  });
+}
+// lâmina de escolha: itens {label, sub, value, danger}
+function pick(header, items) {
+  return new Promise(res => {
+    const p = $('pick'), list = p.querySelector('.list');
+    p.querySelector('.ph').textContent = header;
+    list.innerHTML = '';
+    for (const it of items) {
+      const el = document.createElement('div');
+      el.className = 'pi' + (it.danger ? ' dz' : '');
+      const b = document.createElement('b'); b.textContent = it.label; el.appendChild(b);
+      if (it.sub) { const s = document.createElement('small'); s.textContent = it.sub; el.appendChild(s); }
+      el.onclick = () => { p.classList.remove('on'); res(it.value); };
+      list.appendChild(el);
+    }
+    p.onclick = e => { if (e.target === p) { p.classList.remove('on'); res(null); } };
+    p.classList.add('on');
+  });
+}
+async function ensureVault() {
+  if (Vault.key) return true;
+  if (!Vault.configured()) {
+    let error = '';
+    while (true) {
+      const p1 = await dialog({ title: '🔒 Criar o cofre', msg: 'Frase de 4+ palavras. Ela NÃO é recuperável: sem ela, o conteúdo trancado fica cifrado para sempre. Anote num papel.', ok: 'Continuar', error });
+      if (p1 === null) return false;
+      const p2 = await dialog({ title: '🔒 Confirmar', msg: 'Digite a mesma frase.', ok: 'Criar' });
+      if (p2 === null) return false;
+      if (p1.trim().toLowerCase() !== p2.trim().toLowerCase()) { error = 'As frases não bateram.'; continue; }
+      try { await Vault.setup(p1); return true; }
+      catch (e) { error = e.message; }
+    }
+  }
+  let error = '';
+  while (true) {
+    const p = await dialog({ title: '🔓 Destrancar o cofre', msg: 'Sua frase secreta.', ok: 'Destrancar', error });
+    if (p === null) return false;
+    if (await Vault.unlock(p)) return true;
+    error = 'Frase errada.';
+  }
+}
+
+// ── Notas
+async function refresh() {
+  notes = await DB.all();
+  spacesArr = await DB.spaces();
+  if (cur !== '' && !spacesArr.some(s => s.path === cur)) cur = '';
+  renderStation();
+}
+
+// Laboratório: modo do editor segue a linguagem da nota
+function applyLang() {
+  const lang = current?.lang || 'md';
+  const isCode = lang !== 'md';
+  if (isCode) {
+    // trocar para código com o preview aberto deixava o editor invisível — nunca mais
+    $('eprev').classList.remove('on');
+    $('ewrap').classList.remove('off');
+  }
+  $('ewrap').classList.toggle('code', isCode);
+  $('e-lang').textContent = isCode ? lang.toUpperCase() : '</>';
+  $('e-lang').classList.toggle('live', isCode);
+  $('e-run').style.display = (lang === 'js' || lang === 'html') ? '' : 'none';
+  $('e-view').style.display = isCode ? 'none' : '';
+  if (!isCode) closeRun();
+  renderHL();
+}
+// destaque no ritmo do quadro, nunca no meio da digitação (adeus, tranco)
+let hlQueued = false;
+function queueHL() {
+  if (hlQueued) return;
+  hlQueued = true;
+  requestAnimationFrame(() => { hlQueued = false; renderHL(); });
+}
+function renderHL() {
+  const lang = current?.lang || 'md';
+  if (lang === 'md') { $('hl').innerHTML = ''; return; }
+  $('hl').innerHTML = highlight($('eta').value, lang) + '​';
+  $('hl').scrollTop = $('eta').scrollTop;
+}
+$('eta').addEventListener('scroll', () => { $('hl').scrollTop = $('eta').scrollTop; });
+
+async function openNote(n) {
+  if (n.locked) {
+    if (!(await ensureVault())) return;
+    try { n = { ...n, content: await Vault.dec(n.cipher) }; }
+    catch { toast('não deu para decifrar'); return; }
+  }
+  current = { ...n, lang: n.lang || 'md' };
+  if (noteSpace(n) !== cur) { cur = noteSpace(n); LS.set('cosmos.space', cur); renderStation(); }
+  $('etitle').textContent = titleOf(current);
+  $('e-lock').textContent = notes.find(x => x.id === n.id)?.locked ? '🔓' : '🔒';
+  $('eta').value = current.content;
+  $('eprev').innerHTML = md(current.content);
+  $('eprev').classList.remove('on'); $('ewrap').classList.remove('off');
+  closeRun();
+  applyLang();
+  $('sheet').classList.add('on');
+}
+async function saveCurrent() {
+  if (!current) return;
+  current.content = $('eta').value;
+  current.updated = Date.now();
+  const stored = notes.find(x => x.id === current.id);
+  const base = { id: current.id, title: current.title, space: noteSpace(current), lang: current.lang || 'md', updated: current.updated };
+  if (stored?.locked) {
+    if (!Vault.key) { toast('cofre trancado — destranque para salvar'); return; }
+    await DB.put({ ...base, content: '', locked: true, cipher: await Vault.enc(current.content) });
+  } else {
+    await DB.put({ ...base, content: current.content, locked: false });
+  }
+  await refresh();
+}
+async function createNote(title) {
+  const n = { id: crypto.randomUUID(), title: title.trim(), content: `# ${title.trim()}\n\n`, updated: Date.now(), locked: false, space: cur, lang: 'md' };
+  await DB.put(n); await refresh(); openNote(n);
+}
+
+// ── Eventos do editor
+$('eta').addEventListener('input', () => {
+  if (current?.lang && current.lang !== 'md') queueHL();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveCurrent, 600);
+  // AO VIVO: o Lab responde enquanto você digita
+  if (live && current && (current.lang === 'js' || current.lang === 'html') && $('runpan').classList.contains('on')) {
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(doRun, 700);
+  }
+});
+// conforto de quem programa: Tab indenta, Enter respeita a indentação
+$('eta').addEventListener('keydown', e => {
+  if (!current || current.lang === 'md') return;
+  const ta = e.target;
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    ta.setRangeText('  ', ta.selectionStart, ta.selectionEnd, 'end');
+    ta.dispatchEvent(new Event('input'));
+  } else if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
+    e.preventDefault();
+    const before = ta.value.slice(0, ta.selectionStart);
+    const line = before.slice(before.lastIndexOf('\n') + 1);
+    let ind = (line.match(/^[ \t]*/) || [''])[0];
+    if (/[{([:]\s*$/.test(line)) ind += '  ';
+    ta.setRangeText('\n' + ind, ta.selectionStart, ta.selectionEnd, 'end');
+    ta.dispatchEvent(new Event('input'));
+  }
+});
+// teclado de gente grande (Windows/desktop): Ctrl+Enter roda, Esc fecha
+addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && current && (current.lang === 'js' || current.lang === 'html')) {
+    e.preventDefault(); doRun();
+  } else if (e.key === 'Escape' && $('sheet').classList.contains('on')
+    && !$('dlg').classList.contains('on') && !$('pick').classList.contains('on')) {
+    $('e-back').click();
+  }
+});
+$('e-back').onclick = async () => { await saveCurrent(); current = null; closeRun(); $('sheet').classList.remove('on'); };
+$('e-view').onclick = () => {
+  const on = $('eprev').classList.toggle('on');
+  $('ewrap').classList.toggle('off', on);
+  if (on) $('eprev').innerHTML = md($('eta').value);
+};
+$('e-lang').onclick = async () => {
+  if (!current) return;
+  const v = await pick('LABORATÓRIO · LINGUAGEM DA NOTA', LANGS.map(l => ({
+    label: (l.value === (current.lang || 'md') ? '● ' : '') + l.label, sub: l.sub, value: l.value,
+  })));
+  if (v === null || v === current.lang) return;
+  current.lang = v;
+  applyLang();
+  await saveCurrent();
+  $('etitle').textContent = titleOf(current);
+  toast(v === 'md' ? 'modo texto' : `Lab ${v.toUpperCase()} — destaque vivo ligado`);
+};
+
+// ── Executar de verdade (JS: console capturado · HTML: renderiza) — sandbox, sem rede
+let runId = 0, live = false, liveTimer = null;
+function setLive(v) {
+  live = v;
+  $('run-live').textContent = 'AO VIVO ' + (v ? '●' : '○');
+  $('run-live').classList.toggle('live', v);
+}
+function closeRun() {
+  setLive(false);
+  $('runpan').classList.remove('on');
+  $('ebody').classList.remove('lab');
+  $('runframe').classList.remove('on');
+  $('runframe').srcdoc = '';
+}
+$('run-close').onclick = closeRun;
+$('run-live').onclick = () => { setLive(!live); if (live) doRun(); };
+addEventListener('message', e => {
+  const d = e.data;
+  if (!d || d.cosmosRun !== runId) return;
+  const log = $('runlog');
+  if (log.childElementCount > 400) log.firstChild.remove();
+  const line = document.createElement('div');
+  if (d.t === 'err') { line.className = 'err'; line.textContent = '✗ ' + d.x; }
+  else if (d.t === 'end') { line.textContent = '— fim (' + d.x + 'ms)'; line.style.opacity = 0.5; }
+  else line.textContent = d.x;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+});
+function doRun() {
+  if (!current) return;
+  const lang = current.lang, src = $('eta').value;
+  const pan = $('runpan'), frame = $('runframe'), log = $('runlog');
+  pan.classList.add('on');
+  $('ebody').classList.add('lab');
+  if (lang === 'html') {
+    $('runtitle').textContent = 'HTML AO VIVO';
+    log.style.display = 'none';
+    frame.classList.add('on');
+    frame.srcdoc = src;
+    return;
+  }
+  $('runtitle').textContent = 'CONSOLE DO LAB · JS';
+  frame.classList.remove('on');
+  log.style.display = ''; log.innerHTML = '';
+  runId++;
+  const safe = src.replace(/<\/script/gi, '<\\/script');
+  // dois blocos <script>: se o SEU código tiver erro de sintaxe, o primeiro
+  // bloco continua vivo para reportar — nunca mais silêncio no console
+  let harness = `<script>
+var __go = false;
+var t0 = Date.now();
+function send(t, x) { parent.postMessage({ cosmosRun: ${runId}, t: t, x: String(x) }, '*'); }
+var fmt = function (a) { return a.map(function (v) { try { return typeof v === 'object' ? JSON.stringify(v) : String(v); } catch (e) { return String(v); } }).join(' '); };
+console.log = function () { send('log', fmt([].slice.call(arguments))); };
+console.info = console.log;
+console.error = function () { send('err', fmt([].slice.call(arguments))); };
+console.warn = function () { send('log', '⚠ ' + fmt([].slice.call(arguments))); };
+onerror = function (m, s, l) { send('err', m + (l ? ' (linha ' + Math.max(1, l - __OFF__) + ')' : '')); if (!__go) send('end', 0); return true; };
+<\/script><script>
+__go = true;
+Promise.resolve().then(async function () {
+try {
+__USER__
+} catch (e) { send('err', e.message); }
+send('end', Date.now() - t0);
+});
+<\/script>`;
+  const off = harness.slice(0, harness.indexOf('__USER__')).split('\n').length - 1;
+  harness = harness.replace('__OFF__', off).replace('__USER__', () => safe);
+  frame.srcdoc = harness;
+}
+$('e-run').onclick = () => {
+  const first = !$('runpan').classList.contains('on');
+  doRun();
+  // HTML pede vida: ao abrir o painel, já renderiza enquanto digita
+  if (first && current?.lang === 'html') setLive(true);
+};
+
+// ── menu ⋯: mover pelo multiverso, compartilhar, apagar
+$('e-menu').onclick = async () => {
+  if (!current) return;
+  const v = await pick('NOTA · ' + current.title.toUpperCase().slice(0, 24), [
+    { label: '🌌 Mover para…', sub: 'levar a nota para outro espaço', value: 'move' },
+    { label: '⇗ Compartilhar', sub: 'exporta .' + (EXT[current.lang] || 'md'), value: 'share' },
+    { label: '🗑 Apagar', sub: 'some para sempre', value: 'del', danger: true },
+  ]);
+  if (v === 'move') {
+    const opts = [{ label: '🌌 Estação (raiz)', sub: 'nível de cima de tudo', value: '' },
+      ...spacesArr.map(s => ({ label: lastSeg(s.path), sub: `${DEPTH[kindIdx(s.path)]} · ${s.path}`, value: s.path }))]
+      .filter(o => o.value !== noteSpace(current));
+    if (!opts.length) return toast('crie um portal primeiro (⊕)');
+    const dest = await pick('MOVER PARA', opts);
+    if (dest === null) return;
+    current.space = dest;
+    await saveCurrent();
+    toast(`nota movida para ${dest === '' ? 'a Estação' : lastSeg(dest)}`);
+  } else if (v === 'share') {
+    const ext = EXT[current.lang] || 'md';
+    const type = ext === 'md' ? 'text/markdown' : 'text/plain';
+    const blob = new Blob([$('eta').value], { type });
+    const file = new File([blob], `${current.title}.${ext}`, { type });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      navigator.share({ files: [file], title: current.title }).catch(() => {});
+    } else {
+      const a = document.createElement('a');
+      a.download = `${current.title}.${ext}`; a.href = URL.createObjectURL(blob); a.click();
+    }
+  } else if (v === 'del') {
+    if (!(await dialog({ title: 'Apagar nota', msg: `"${titleOf(current)}" será apagada para sempre.`, input: false, ok: 'Apagar' }))) return;
+    await DB.del(current.id); current = null; closeRun();
+    $('sheet').classList.remove('on'); await refresh();
+  }
+};
+$('e-lock').onclick = async () => {
+  if (!current) return;
+  const stored = notes.find(x => x.id === current.id);
+  if (!(await ensureVault())) return;
+  if (stored?.locked) {
+    await DB.put({ id: stored.id, title: stored.title, space: noteSpace(stored), lang: stored.lang || 'md', content: current.content, updated: Date.now(), locked: false });
+    toast('🔓 nota destrancada'); $('e-lock').textContent = '🔒';
+  } else {
+    await saveCurrent();
+    await DB.put({ id: current.id, title: current.title, space: noteSpace(current), lang: current.lang || 'md', content: '', locked: true, cipher: await Vault.enc($('eta').value), updated: Date.now() });
+    toast('🔒 cifrada com AES-256'); $('e-lock').textContent = '🔓';
+  }
+  await refresh();
+};
+
+// ── busca global (atravessa universos; abrir viaja até lá)
+const $q = $('q'), $res = $('results');
+function renderResults() {
+  const q = $q.value.trim().toLowerCase();
+  if (!q) { $res.classList.remove('on'); return; }
+  const nHits = notes.filter(n =>
+    titleOf(n).toLowerCase().includes(q) || (!n.locked && n.content.toLowerCase().includes(q))).slice(0, 6);
+  const sHits = spacesArr.filter(s => lastSeg(s.path).toLowerCase().includes(q)).slice(0, 3);
+  $res.innerHTML = sHits.map(s =>
+    `<div class="res" data-space="${esc(s.path)}"><b>◈ ${esc(lastSeg(s.path))}</b><small class="mono">${DEPTH[kindIdx(s.path)]} · ${esc(s.path)}</small></div>`).join('')
+    + nHits.map(n =>
+    `<div class="res" data-id="${n.id}"><b>${esc(titleOf(n))}</b><small>${n.locked ? 'cifrada no aparelho' : esc(n.content.replace(/^#.+\n?/, '').replace(/[#*_>\[\]`|-]/g, '').trim().slice(0, 70))}</small></div>`).join('')
+    + `<div class="res" data-new="1"><b>⊕ criar "${esc($q.value.trim())}"</b><small>um planeta novo ${cur ? 'em ' + esc(lastSeg(cur)) : 'na sua órbita'}</small></div>`;
+  $res.classList.add('on');
+}
+$q.addEventListener('input', renderResults);
+$res.addEventListener('click', e => {
+  const el = e.target.closest('.res'); if (!el) return;
+  $res.classList.remove('on');
+  const q = $q.value.trim(); $q.value = ''; $q.blur();
+  if (el.dataset.new) return createNote(q);
+  if (el.dataset.space !== undefined) return warpTo(el.dataset.space);
+  const n = notes.find(x => x.id === el.dataset.id);
+  if (n) openNote(n);
+});
+$('go').onclick = () => { if ($q.value.trim()) { const t = $q.value.trim(); $q.value = ''; $res.classList.remove('on'); createNote(t); } };
+$q.addEventListener('keydown', e => { if (e.key === 'Enter' && $q.value.trim()) { const t = $q.value.trim(); $q.value = ''; $res.classList.remove('on'); createNote(t); } });
+
+// ── portais: criar
+$('b-portal').onclick = async () => {
+  const k = Math.min(kindIdx(cur + '/x'), 3);
+  const name = await dialog({
+    title: `⊕ Novo ${DEPTH[k].toLowerCase()}`,
+    msg: cur === '' ? 'Um universo novo nasce na sua Estação.' : `Nasce dentro de ${lastSeg(cur)}.`,
+    ok: 'Criar',
+  });
+  if (!name || !name.trim()) return;
+  const nm = name.trim().replace(/\//g, '·');
+  const path = cur === '' ? nm : `${cur}/${nm}`;
+  if (spacesArr.some(s => s.path === path)) return toast('já existe um portal com esse nome aqui');
+  await DB.putSpace({ path });
+  await refresh();
+  toast(`◈ ${DEPTH[kindIdx(path)].toLowerCase()} “${nm}” criado`);
+};
+
+// ── importar (.md e irmãos viram notas aqui; .cosmosverse restaura backup)
+$('b-import').onclick = () => $('fimp').click();
+$('fimp').addEventListener('change', async () => {
+  let c = 0;
+  for (const f of $('fimp').files) {
+    if (/\.(cosmosverse|json)$/i.test(f.name)) {
+      try { await importBackup(JSON.parse(await f.text())); }
+      catch { toast('backup inválido'); }
+      continue;
+    }
+    const ext = (f.name.match(/\.(\w+)$/) || [])[1]?.toLowerCase() || 'md';
+    const lang = EXT2LANG[ext] || 'md';
+    await DB.put({
+      id: crypto.randomUUID(), title: f.name.replace(/\.\w+$/, ''),
+      content: await f.text(), updated: Date.now(), locked: false, space: cur, lang,
+    });
+    c++;
+  }
+  $('fimp').value = ''; await refresh();
+  if (c) toast(`⇘ ${c} nota${c > 1 ? 's' : ''} importada${c > 1 ? 's' : ''}`);
+});
+
+// ── backup completo: o cosmos inteiro num arquivo (trancadas viajam CIFRADAS)
+$('b-backup').onclick = () => {
+  const d = new Date();
+  const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const data = {
+    kind: 'cosmos-backup', v: 1, when: stamp,
+    salt: LS.get('cosmos.salt'), verifier: LS.get('cosmos.verifier'),
+    spaces: spacesArr, notes,
+  };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.download = `cosmos-${stamp}.cosmosverse`; a.href = URL.createObjectURL(blob); a.click();
+  toast('⛃ backup baixado — guarde em lugar seguro');
+};
+async function importBackup(data) {
+  if (data.kind !== 'cosmos-backup' || !Array.isArray(data.notes)) { toast('backup inválido'); return; }
+  const localSalt = LS.get('cosmos.verifier') ? LS.get('cosmos.salt') : null;
+  let adoptVault = false, skipLocked = false;
+  if (!localSalt && data.salt && data.verifier) adoptVault = true;
+  else if (localSalt && data.salt && data.salt !== localSalt) skipLocked = true;
+  if (adoptVault) { LS.set('cosmos.salt', data.salt); LS.set('cosmos.verifier', data.verifier); }
+  let c = 0, skipped = 0;
+  for (const s of data.spaces || []) if (s.path) await DB.putSpace({ path: s.path });
+  for (const n of data.notes) {
+    if (!n.id) continue;
+    if (n.locked && skipLocked) { skipped++; continue; }
+    await DB.put(n); c++;
+  }
+  await refresh();
+  toast(`⛃ ${c} notas restauradas` + (skipped ? ` · ${skipped} trancadas puladas (cofre de outro aparelho)` : ''));
+}
+
+// ── foto do céu
+$('b-photo').onclick = () => {
+  const out = document.createElement('canvas');
+  out.width = sky.width; out.height = sky.height;
+  const c2 = out.getContext('2d');
+  c2.fillStyle = '#0a0a12'; c2.fillRect(0, 0, out.width, out.height);
+  c2.drawImage(sky, 0, 0);
+  c2.font = `700 ${Math.round(out.width / 34)}px ui-monospace, monospace`;
+  c2.textAlign = 'right'; c2.fillStyle = 'rgba(255,255,255,0.55)';
+  c2.fillText('✦ MEU COSMOS', out.width - 28, out.height - 30);
+  const a = document.createElement('a');
+  a.download = 'meu-cosmos.png'; a.href = out.toDataURL('image/png'); a.click();
+};
+$('eprev').addEventListener('click', e => {
+  const l = e.target.closest('a[data-note]'); if (!l) return;
+  e.preventDefault();
+  const name = l.dataset.note.toLowerCase();
+  const n = notes.find(x => titleOf(x).toLowerCase().replace(/^🔒 /, '') === name || x.title.toLowerCase() === name);
+  if (n) openNote(n);
+});
+
+// ── Boot: a Academia nasce num céu vazio
+async function boot() {
+  applyPhase(); fit();
+  await DB.open(); await refresh();
+  if (DB._mem) toast('⚠ este navegador não guarda dados de arquivos locais — use ⛃ backup sempre');
+  cur = LS.get('cosmos.space') || '';
+  if (cur !== '' && !spacesArr.some(s => s.path === cur)) cur = '';
+  if (notes.length === 0 && spacesArr.length === 0) {
+    await DB.put({
+      id: crypto.randomUUID(), title: 'Manual do Navegador', updated: Date.now(), locked: false, space: '', lang: 'md',
+      content: [
+        '# Manual do Navegador', '',
+        '> *Ano 2099. Este cosmos cabe no seu bolso — e é só seu.*', '',
+        'Bem-vindo à **Estação COSMOS**, Navegador. Funciona em qualquer',
+        'aparelho — Android, Windows, tablet — e **offline**.', '',
+        '## Cartografia',
+        '| Portal | O que é |',
+        '|---|---|',
+        '| ◎ anel duplo | **Universo** — grandes áreas da vida |',
+        '| ✦ espiral | **Galáxia** — temas dentro de um universo |',
+        '| ☾ com luas | **Sistema** — projetos |',
+        '| ○ anel | **Setor** — o detalhe fino |', '',
+        '- Toque num **portal** para mergulhar · no **sol** para subir',
+        '- Segure um portal para **desfazê-lo** (nada se perde)',
+        '- ⊕ cria um portal · a barra de baixo **busca e cria** notas', '',
+        '## Notas',
+        '- `- [ ] missão` vira tarefa · **negrito**, tabelas, `código`',
+        '- 👁 alterna edição/leitura · ⋯ move, compartilha ou apaga',
+        '- 🔒 cifra com **AES-256** no aparelho (a frase não é recuperável!)', '',
+        '## Laboratório de código',
+        '- `</>` transforma a nota em código com **destaque vivo**',
+        '- ▶ executa JS e HTML de verdade · **AO VIVO** roda enquanto digita',
+        '- No teclado: `Ctrl+Enter` executa · `Esc` fecha a nota',
+        '- Explore a [[Primeira órbita]] na Academia', '',
+        '## Sobrevivência',
+        '- ⛃ baixa um **backup completo** (.cosmosverse) — faça sempre',
+        '- ⇘ importa .md, código e backups', '',
+        'Suas notas moram **neste aparelho** — nada sobe para nuvem nenhuma.', '',
+        '- [ ] Primeira missão: crie sua primeira nota agora',
+      ].join('\n'),
+    });
+    await DB.putSpace({ path: 'Academia' });
+    await DB.put({
+      id: crypto.randomUUID(), title: 'Treinamento', updated: Date.now(), locked: false, space: 'Academia', lang: 'md',
+      content: [
+        '# Treinamento', '',
+        'Você mergulhou num **universo** — repare no céu: aqui dentro só existe',
+        'o que pertence à Academia. O sol virou o coração deste espaço.', '',
+        '- [ ] Toque no sol para voltar à Estação',
+        '- [ ] Crie um portal seu com ⊕',
+        '- [ ] Abra a nota [[Primeira órbita]] e toque em ▶',
+      ].join('\n'),
+    });
+    await DB.put({
+      id: crypto.randomUUID(), title: 'Primeira órbita', updated: Date.now(), locked: false, space: 'Academia', lang: 'js',
+      content: [
+        '// Laboratório do COSMOS — código de verdade, rodando no aparelho.',
+        "// Toque em ▶ e veja o console responder.",
+        "// Ligue o AO VIVO e mude o número de voltas: ele roda sozinho.",
+        '',
+        "const nave = 'COSMOS';",
+        'function orbita(corpo) {',
+        '  return `${corpo} em órbita estável`;',
+        '}',
+        'for (let i = 1; i <= 3; i++) {',
+        '  console.log(i, orbita(nave));',
+        '}',
+        "console.log('Tudo verde. Bom voo, Navegador. 🚀');",
+      ].join('\n'),
+    });
+    await refresh();
+  }
+  // ── uma vez por aparelho: a Estação deixa uma carta no céu
+  if (!LS.get('cosmos.carta')) {
+    await DB.put({
+      id: crypto.randomUUID(), title: 'Carta da Estação', updated: Date.now(), locked: false, space: '', lang: 'md',
+      content: [
+        '# Carta da Estação', '',
+        '> Transmissão automática · prioridade: pessoal', '',
+        'Navegador,', '',
+        'Se você está lendo isto, a Estação está inteira e em silêncio —',
+        'do jeito que ela fica quando você não está.', '',
+        'Quem construiu esta Estação com você deixou um recado antes de partir:', '',
+        '- O cosmos não cobra pressa. As órbitas giram sozinhas.',
+        '- Cada portal que você abriu segue exatamente onde deixou.',
+        '- O cofre não esquece. E o que você aprendeu construindo isto,',
+        '  você também não vai esquecer.', '',
+        'Quando voltar — semana que vem ou daqui a anos — toque no sol.',
+        'Ele ainda vai dizer **VOCÊ**. Isso nunca muda.', '',
+        'Bom voo. E obrigado por construir isto comigo.', '',
+        '— a Estação 🛰',
+      ].join('\n'),
+    });
+    LS.set('cosmos.carta', '1');
+    await refresh();
+  }
+  renderStation();
+  draw();
+  loop();
+}
+boot();
+</script>
+</body>
+</html>

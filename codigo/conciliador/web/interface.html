@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conciliador</title>
+<style>
+:root{
+  --fundo:#0e1116; --fundo2:#151a21; --fundo3:#1c232c; --borda:#262f3a;
+  --texto:#e6edf3; --fraco:#8b98a5; --tenue:#5c6773;
+  --ok:#2ea043; --ok2:#3fb950; --alerta:#d29922; --erro:#f85149;
+  --azul:#3b82f6; --roxo:#8b5cf6;
+  --r:12px; --som:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.5);
+}
+@media (prefers-color-scheme: light){
+  :root{--fundo:#f6f8fa;--fundo2:#fff;--fundo3:#eef1f4;--borda:#d8dee4;
+        --texto:#1f2328;--fraco:#59636e;--tenue:#8c959f;--som:0 1px 2px rgba(0,0,0,.06),0 8px 24px -14px rgba(0,0,0,.18);}
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--fundo);color:var(--texto);font:15px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Inter,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;padding-bottom:80px}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--fundo) 88%,transparent);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--borda)}
+.barra{max-width:1180px;margin:0 auto;padding:14px 22px;display:flex;align-items:center;gap:14px}
+.marca{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:-.2px}
+.marca svg{width:22px;height:22px}
+.chip{font-size:12px;color:var(--fraco);background:var(--fundo3);border:1px solid var(--borda);
+  padding:3px 9px;border-radius:99px}
+.cresce{flex:1}
+main{max-width:1180px;margin:0 auto;padding:24px 22px}
+button{font:inherit;cursor:pointer;border-radius:9px;border:1px solid var(--borda);
+  background:var(--fundo3);color:var(--texto);padding:8px 14px;transition:.13s;font-weight:520}
+button:hover{border-color:var(--tenue);transform:translateY(-1px)}
+button:active{transform:none}
+button.forte{background:var(--ok);border-color:var(--ok);color:#fff}
+button.forte:hover{background:var(--ok2)}
+button.risco{color:var(--erro)}
+button.plano{background:transparent}
+button:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.tecla{display:inline-block;min-width:19px;padding:1px 5px;margin-left:7px;border-radius:5px;
+  background:rgba(255,255,255,.1);border:1px solid var(--borda);font-size:11px;color:var(--fraco)}
+button.forte .tecla{background:rgba(0,0,0,.22);border-color:transparent;color:#e9ffe9}
+
+/* ---------- entrada ---------- */
+#inicio{padding:36px 0}
+h1{font-size:30px;letter-spacing:-.7px;font-weight:680;margin-bottom:8px}
+.sub{color:var(--fraco);max-width:620px;margin-bottom:28px}
+.solta{border:1.5px dashed var(--borda);border-radius:16px;background:var(--fundo2);
+  padding:44px 28px;text-align:center;transition:.16s}
+.solta.ativa{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 8%,var(--fundo2))}
+.solta h3{font-size:17px;font-weight:600;margin-bottom:6px}
+.solta p{color:var(--fraco);font-size:13.5px;margin-bottom:18px}
+.linhas{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.dica{margin-top:26px;display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px}
+.dica div{background:var(--fundo2);border:1px solid var(--borda);border-radius:var(--r);padding:14px 16px}
+.dica b{display:block;font-size:13px;margin-bottom:3px}
+.dica span{font-size:12.5px;color:var(--fraco)}
+
+/* ---------- painel ---------- */
+.placar{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px;margin-bottom:16px}
+.cartao{background:var(--fundo2);border:1px solid var(--borda);border-radius:var(--r);padding:16px 18px;box-shadow:var(--som)}
+.cartao .rot{font-size:11.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--tenue);margin-bottom:7px}
+.cartao .val{font-size:29px;font-weight:660;letter-spacing:-1px;line-height:1.05}
+.cartao .pe{font-size:12.5px;color:var(--fraco);margin-top:5px}
+.cartao.v .val{color:var(--ok2)} .cartao.a .val{color:var(--alerta)}
+.trilha{height:7px;border-radius:99px;background:var(--fundo3);overflow:hidden;display:flex;margin:4px 0 22px}
+.trilha i{display:block;height:100%}
+.legenda{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--fraco);margin-bottom:22px}
+.legenda i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:6px}
+
+/* ---------- fila ---------- */
+.caixa{background:var(--fundo2);border:1px solid var(--borda);border-radius:14px;box-shadow:var(--som);overflow:hidden;margin-bottom:22px}
+.topo{padding:13px 18px;border-bottom:1px solid var(--borda);display:flex;align-items:center;gap:12px;
+  font-size:13px;font-weight:600}
+.topo .cinza{font-weight:400;color:var(--fraco)}
+.duelo{display:grid;grid-template-columns:1fr auto 1fr;gap:0;align-items:stretch}
+.lado{padding:20px 22px}
+.lado+.meio+.lado{border-left:1px solid var(--borda)}
+.meio{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:0 6px;min-width:132px}
+.meio .porque{font-size:11.5px;color:var(--fraco);text-align:center;line-height:1.5}
+.selo{font-size:11px;font-weight:650;padding:3px 9px;border-radius:99px;white-space:nowrap}
+.selo.v{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok2)}
+.selo.a{background:color-mix(in srgb,var(--alerta) 18%,transparent);color:var(--alerta)}
+.selo.n{background:var(--fundo3);color:var(--fraco)}
+.etiq{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--tenue);margin-bottom:9px}
+.dinheiro{font-size:23px;font-weight:660;letter-spacing:-.6px;margin-bottom:3px}
+.dinheiro.neg{color:var(--erro)} .dinheiro.pos{color:var(--ok2)}
+.info{font-size:13.5px;color:var(--texto);word-break:break-word}
+.meta{font-size:12.5px;color:var(--fraco);margin-top:5px}
+.rodape{padding:13px 18px;border-top:1px solid var(--borda);display:flex;gap:9px;align-items:center;background:var(--fundo)}
+.item2{border-top:1px dashed var(--borda);margin-top:12px;padding-top:12px}
+
+/* ---------- abas e tabelas ---------- */
+nav.abas{display:flex;gap:2px;border-bottom:1px solid var(--borda);margin-bottom:0;overflow-x:auto}
+nav.abas button{border:none;background:none;border-radius:0;border-bottom:2px solid transparent;
+  color:var(--fraco);padding:11px 15px;white-space:nowrap;font-weight:520}
+nav.abas button:hover{color:var(--texto);transform:none}
+nav.abas button.on{color:var(--texto);border-bottom-color:var(--ok)}
+nav.abas .cont{font-size:11px;background:var(--fundo3);border-radius:99px;padding:1px 7px;margin-left:6px;color:var(--fraco)}
+.rolo{max-height:60vh;overflow:auto;border:1px solid var(--borda);border-top:none;border-radius:0 0 var(--r) var(--r);background:var(--fundo2)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{position:sticky;top:0;background:var(--fundo3);text-align:left;font-size:11.5px;text-transform:uppercase;
+  letter-spacing:.6px;color:var(--tenue);padding:9px 13px;font-weight:600;z-index:2;white-space:nowrap}
+td{padding:9px 13px;border-top:1px solid var(--borda);vertical-align:top}
+tr:hover td{background:color-mix(in srgb,var(--fundo3) 55%,transparent)}
+td.d{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pill{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--fundo3);color:var(--fraco);white-space:nowrap}
+select{font:inherit;font-size:12.5px;background:var(--fundo3);color:var(--texto);border:1px solid var(--borda);
+  border-radius:7px;padding:4px 7px;max-width:190px}
+.vazia{padding:44px 20px;text-align:center;color:var(--tenue);font-size:14px}
+.aviso{background:color-mix(in srgb,var(--alerta) 12%,var(--fundo2));border:1px solid color-mix(in srgb,var(--alerta) 34%,var(--borda));
+  border-radius:var(--r);padding:12px 16px;font-size:13.5px;margin-bottom:16px}
+footer{max-width:1180px;margin:34px auto 0;padding:0 22px;color:var(--tenue);font-size:12.5px;line-height:1.7}
+.oculto{display:none!important}
+#carga{position:fixed;inset:0;background:color-mix(in srgb,var(--fundo) 82%,transparent);display:flex;
+  align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:60;backdrop-filter:blur(3px)}
+.giro{width:26px;height:26px;border:2.5px solid var(--borda);border-top-color:var(--ok);border-radius:50%;animation:g .7s linear infinite}
+@keyframes g{to{transform:rotate(360deg)}}
+@media(max-width:820px){.duelo{grid-template-columns:1fr}.lado+.meio+.lado{border-left:none;border-top:1px solid var(--borda)}
+  .meio{flex-direction:row;padding:12px;border-top:1px solid var(--borda)}}
+</style>
+</head>
+<body>
+<header><div class="barra">
+  <span class="marca">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 7h10M4 7l3-3M4 7l3 3" stroke="#3fb950"/><path d="M20 17H10M20 17l-3-3M20 17l-3 3" stroke="#3b82f6"/>
+    </svg>Conciliador</span>
+  <span class="chip" id="rotuloCaixa">nada carregado</span>
+  <span class="cresce"></span>
+  <button class="plano oculto" id="btnExp1">Exportar conciliados</button>
+  <button class="plano oculto" id="btnExp2">Exportar pendências</button>
+  <button class="plano oculto" id="btnNovo">Novo</button>
+</div></header>
+
+<main>
+<section id="inicio">
+  <h1>Conciliação bancária sem planilha.</h1>
+  <p class="sub">Solte o extrato do banco e a carteira de títulos do ERP. O sistema casa o que
+  tem certeza, mostra por quê, e te entrega só o que precisa de decisão humana.</p>
+  <div class="solta" id="solta">
+    <h3>Arraste os dois arquivos aqui</h3>
+    <p>Extrato em OFX ou CSV · títulos em CSV ou XLSX · nada sai do seu computador</p>
+    <div class="linhas">
+      <button class="forte" id="btnEscolher">Escolher arquivos</button>
+      <button id="btnExemplo">Ver funcionando com dados de exemplo</button>
+    </div>
+    <input type="file" id="arq" multiple accept=".csv,.ofx,.qfx,.xlsx,.xlsm,.txt,.tsv" style="display:none">
+  </div>
+  <div class="dica">
+    <div><b>Não precisa configurar coluna</b><span>Descobre data, valor, histórico e documento sozinho — inclusive débito/crédito em colunas separadas.</span></div>
+    <div><b>Pagamento em lote</b><span>Um Pix que quitou três boletos do mesmo fornecedor é reconhecido como um grupo.</span></div>
+    <div><b>Só decide o que é certeza</b><span>Havendo duas hipóteses de força parecida, ele para e pergunta em vez de chutar.</span></div>
+    <div><b>Aprende com você</b><span>Cada confirmação e cada recusa ficam gravadas e melhoram o mês seguinte.</span></div>
+  </div>
+</section>
+
+<section id="painel" class="oculto">
+  <div class="placar" id="placar"></div>
+  <div class="trilha" id="trilha"></div>
+  <div class="legenda" id="legenda"></div>
+  <div id="avisos"></div>
+
+  <div id="zonaFila"></div>
+
+  <nav class="abas" id="abas"></nav>
+  <div class="rolo" id="tabela"></div>
+</section>
+</main>
+
+<footer id="pe" class="oculto"></footer>
+<div id="carga" class="oculto"><div class="giro"></div><span id="cargaTxt">processando…</span></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let E = null, aba = 'fila', foco = 0;
+
+const fmt = c => (c<0?'-':'') + 'R$ ' + Math.abs(c/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const data = s => s ? s.split('-').reverse().join('/') : '—';
+const esc = s => String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function carga(on, txt){ $('#carga').classList.toggle('oculto', !on); if(txt) $('#cargaTxt').textContent = txt; }
+
+async function api(rota, corpo){
+  const r = await fetch(rota, corpo ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)} : {});
+  const j = await r.json();
+  if(j.erro) throw new Error(j.erro);
+  return j;
+}
+
+/* ---------------- entrada de arquivos ---------------- */
+const solta = $('#solta');
+['dragenter','dragover'].forEach(e=>solta.addEventListener(e,ev=>{ev.preventDefault();solta.classList.add('ativa')}));
+['dragleave','drop'].forEach(e=>solta.addEventListener(e,ev=>{ev.preventDefault();solta.classList.remove('ativa')}));
+solta.addEventListener('drop', ev => receber([...ev.dataTransfer.files]));
+$('#btnEscolher').onclick = () => $('#arq').click();
+$('#arq').onchange = e => receber([...e.target.files]);
+$('#btnExemplo').onclick = async () => { carga(true,'gerando carteira de exemplo…');
+  try{ pintar(await api('/api/exemplo',{semente: Math.floor(Math.random()*900)+1, n:45})); }
+  catch(e){ alert(e.message) } finally{ carga(false) } };
+$('#btnNovo').onclick = () => location.reload();
+$('#btnExp1').onclick = () => location.href='/api/exportar/conciliado.csv';
+$('#btnExp2').onclick = () => location.href='/api/exportar/pendencias.csv';
+
+async function receber(files){
+  if(!files.length) return;
+  carga(true, 'lendo ' + files.length + (files.length>1?' arquivos…':' arquivo…'));
+  try{
+    const arquivos = await Promise.all(files.map(f => new Promise((ok,err)=>{
+      const fr = new FileReader();
+      fr.onload = () => ok({nome:f.name, dados: fr.result.split(',')[1]});
+      fr.onerror = err; fr.readAsDataURL(f);
+    })));
+    carga(true,'conciliando…');
+    pintar(await api('/api/carregar',{arquivos}));
+  }catch(e){ alert('Não deu para ler: ' + e.message) } finally{ carga(false) }
+}
+
+/* ---------------- pintura ---------------- */
+function pintar(e){
+  if(!e || e.vazio) return;
+  E = e; foco = 0;
+  $('#inicio').classList.add('oculto');
+  $('#painel').classList.remove('oculto');
+  ['#btnExp1','#btnExp2','#btnNovo'].forEach(s=>$(s).classList.remove('oculto'));
+  const m = e.metricas;
+  const fontes = Object.entries(e.fontes||{}).map(([n,f])=>`${n} → ${f.papel==='extrato'?'extrato':'títulos'} (${f.linhas} linhas)`);
+  $('#rotuloCaixa').textContent = fontes.join('  ·  ') || e.caixa;
+  $('#rotuloCaixa').title = fontes.join('\n');
+
+  const conc = m.aprovados, prontos = m.vinculos_certos, fila = m.sugestoes;
+  // linhas do extrato ja resolvidas = confirmadas por voce + prontas por certeza.
+  // Sem somar as duas, a barra zerava depois de confirmar tudo.
+  const linhasConc = e.aprovados.reduce((a,v)=>a+v.lanc.length,0) + m.lanc_conciliados;
+  $('#placar').innerHTML = `
+    ${cartao('conciliado', conc + prontos, `${linhasConc} de ${m.total_lanc_original} linhas do extrato`, 'v')}
+    ${cartao('precisa de você', fila, fila? 'decisão em 1 tecla' : 'nada pendente', fila?'a':'')}
+    ${cartao('extrato sem título', m.lanc_sem_par, 'tarifa, imposto, folha…', '')}
+    ${cartao('títulos em aberto', m.tit_sem_par, 'sem pagamento no extrato', '')}
+    ${cartao('valor conciliado', fmt(m.valor_aprovado_cent + m.valor_conciliado_cent), pct(m), 'v')}`;
+
+  const tot = Math.max(1, m.total_lanc_original);
+  const a = linhasConc/tot*100, b = qtdFila(e)/tot*100, c = m.lanc_sem_par/tot*100;
+  $('#trilha').innerHTML = `<i style="width:${a}%;background:var(--ok)"></i><i style="width:${b}%;background:var(--alerta)"></i><i style="width:${c}%;background:var(--tenue)"></i>`;
+  $('#legenda').innerHTML = `<span><i style="background:var(--ok)"></i>${(a).toFixed(0)}% casado automaticamente</span>
+    <span><i style="background:var(--alerta)"></i>${(b).toFixed(0)}% aguardando sua decisão</span>
+    <span><i style="background:var(--tenue)"></i>${(c).toFixed(0)}% sem título correspondente</span>`;
+
+  const av = [];
+  if(e.duplicados.length) av.push(`<b>${e.duplicados.length}</b> possível(is) lançamento(s) repetido(s) no extrato — mesma data, mesmo valor, mesmo histórico. Confira antes de conciliar.`);
+  if(prontos) av.push(`<b>${prontos}</b> vínculo(s) com certeza matemática aguardando um único clique em <i>Confirmar todos</i>.`);
+  $('#avisos').innerHTML = av.map(t=>`<div class="aviso">${t}</div>`).join('');
+
+  desenharFila();
+  desenharAbas();
+  $('#pe').classList.remove('oculto');
+  $('#pe').innerHTML = `Janela de data: ${e.cfg.janela_pago} dias da baixa / ${e.cfg.janela_venc} do vencimento ·
+    tolerância de tarifa: ${fmt(e.cfg.tolerancia_cent)} ou ${(e.cfg.tolerancia_frac*100).toFixed(1)}% ·
+    um vínculo só é automático com valor exato ao centavo, direção correta, identidade confirmada e nenhuma hipótese rival de força parecida.<br>
+    Suas decisões ficam em <code>~/.conciliador/${esc(e.caixa)}.jsonl</code> — arquivo de eventos, nada é sobrescrito.`;
+}
+const pct = m => { const t = m.valor_total_cent||1; return ((m.valor_aprovado_cent+m.valor_conciliado_cent)/t*100).toFixed(0) + '% do valor movimentado'; };
+const qtdFila = e => new Set(e.fila.flatMap(v=>v.lanc.map(l=>l.id))).size;
+const cartao = (rot,val,pe,cls='') => `<div class="cartao ${cls}"><div class="rot">${rot}</div>
+  <div class="val num">${val}</div><div class="pe">${pe}</div></div>`;
+
+/* ---------------- fila de decisão ---------------- */
+function desenharFila(){
+  const z = $('#zonaFila');
+  const prontos = E.certos, fila = E.fila;
+  if(!prontos.length && !fila.length){ z.innerHTML = ''; return; }
+  let html = '';
+  if(prontos.length){
+    html += `<div class="caixa"><div class="topo">
+      <span class="selo v">certeza</span> ${prontos.length} vínculo(s) prontos
+      <span class="cinza">valor exato, identidade confirmada, sem hipótese rival</span>
+      <span class="cresce" style="flex:1"></span>
+      <button class="forte" onclick="aprovarTudo()">Confirmar todos<span class="tecla">C</span></button></div>
+      ${duelo(prontos[0], true)}</div>`;
+  }
+  if(fila.length){
+    const v = fila[Math.min(foco, fila.length-1)];
+    html += `<div class="caixa"><div class="topo">
+      <span class="selo a">decidir</span> ${Math.min(foco+1,fila.length)} de ${fila.length}
+      <span class="cinza">${v.rivais? v.rivais+' hipótese(s) concorrente(s) para as mesmas linhas' : 'sem concorrente, mas falta uma confirmação'}</span></div>
+      ${duelo(v, false)}
+      <div class="rodape">
+        <button class="forte" onclick="decidir('${v.id}','aprovar')">Confirmar<span class="tecla">↵</span></button>
+        <button class="risco" onclick="decidir('${v.id}','rejeitar')">Não é isso<span class="tecla">X</span></button>
+        <button class="plano" onclick="pular(1)">Pular<span class="tecla">→</span></button>
+        <span style="flex:1"></span>
+        <span style="font-size:12.5px;color:var(--fraco)">confiança ${Math.round(v.escore*100)}%</span>
+      </div></div>`;
+  }
+  z.innerHTML = html;
+}
+
+function duelo(v, curto){
+  const L = v.lanc, T = v.tits;
+  const sinal = c => c<0?'neg':'pos';
+  const lado1 = L.map((l,i)=>`<div class="${i?'item2':''}">
+      ${i?'':'<div class="etiq">extrato bancário</div>'}
+      <div class="dinheiro num ${sinal(l.cent)}">${fmt(l.cent)}</div>
+      <div class="info">${esc(l.desc)||'<i style="color:var(--tenue)">sem histórico</i>'}</div>
+      <div class="meta">${data(l.data)}${l.doc?' · doc '+esc(l.doc):''}</div></div>`).join('');
+  const lado2 = T.map((t,i)=>`<div class="${i?'item2':''}">
+      ${i?'':'<div class="etiq">título no ERP</div>'}
+      <div class="dinheiro num">${fmt(t.cent)}</div>
+      <div class="info">${esc(t.parte)||'<i style="color:var(--tenue)">sem contraparte</i>'}</div>
+      <div class="meta">${t.tipo==='pagar'?'a pagar':t.tipo==='receber'?'a receber':'—'} ·
+        venc ${data(t.venc)}${t.doc?' · doc '+esc(t.doc):''}${t.cat?' · '+esc(t.cat):''}</div></div>`).join('');
+  return `<div class="duelo">
+    <div class="lado">${lado1}</div>
+    <div class="meio">
+      <span class="selo ${v.confianca==='certeza'?'v':'n'}">${v.forma==='1:1'?'1 para 1':v.forma.replace(':',' para ')}</span>
+      <div class="porque">${v.motivos.map(esc).join('<br>')||'—'}</div>
+      ${v.dif? `<span class="selo a">falta ${fmt(Math.abs(v.dif))}</span>`:''}
+    </div>
+    <div class="lado">${lado2}</div></div>`;
+}
+
+async function decidir(id, acao){
+  carga(true, acao==='aprovar'?'confirmando…':'descartando…');
+  try{ pintar(await api('/api/decidir',{vinculo:id, acao})); }
+  catch(e){ alert(e.message) } finally{ carga(false) }
+}
+async function aprovarTudo(){
+  carga(true,'confirmando os vínculos de certeza…');
+  try{ const r = await api('/api/aprovar-tudo',{}); pintar(r); }
+  catch(e){ alert(e.message) } finally{ carga(false) }
+}
+async function desfazer(id){
+  carga(true,'desfazendo…');
+  try{ pintar(await api('/api/desfazer',{vinculo:id})); }
+  catch(e){ alert(e.message) } finally{ carga(false) }
+}
+async function rotular(chave, rotulo){
+  try{ pintar(await api('/api/rotular',{chave, rotulo})); }catch(e){ alert(e.message) }
+}
+function pular(d){ if(!E.fila.length) return; foco = (foco + d + E.fila.length) % E.fila.length; desenharFila(); }
+
+document.addEventListener('keydown', ev => {
+  if(!E || ev.metaKey || ev.ctrlKey || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  const v = E.fila[Math.min(foco, E.fila.length-1)];
+  if(ev.key==='Enter' && v){ ev.preventDefault(); decidir(v.id,'aprovar'); }
+  else if((ev.key==='x'||ev.key==='X') && v){ decidir(v.id,'rejeitar'); }
+  else if(ev.key==='ArrowRight'||ev.key===' '){ ev.preventDefault(); pular(1); }
+  else if(ev.key==='ArrowLeft'){ pular(-1); }
+  else if(ev.key==='c'||ev.key==='C'){ if(E.certos.length) aprovarTudo(); }
+});
+
+/* ---------------- abas ---------------- */
+const ROTULOS = ['Tarifas bancárias','Impostos e contribuições','Folha de pagamento',
+  'Movimentação interna','Receita financeira','Estorno / devolução','Juros e encargos',
+  'Cartão','Empréstimo / financiamento','Despesa sem título no ERP','Receita sem título no ERP'];
+
+function desenharAbas(){
+  const abas = [
+    ['fila','A decidir', E.fila.length],
+    ['conciliado','Conciliado', E.aprovados.length],
+    ['sobras','Extrato sem título', E.sobras.length],
+    ['abertos','Títulos em aberto', E.abertos.length],
+  ];
+  $('#abas').innerHTML = abas.map(([k,t,n])=>
+    `<button class="${aba===k?'on':''}" onclick="trocar('${k}')">${t}<span class="cont num">${n}</span></button>`).join('');
+  desenharTabela();
+}
+function trocar(k){ aba = k; desenharAbas(); }
+
+function desenharTabela(){
+  const t = $('#tabela');
+  if(aba==='fila'){
+    if(!E.fila.length) return void(t.innerHTML = vazia('Nada aguardando decisão. Tudo que dava para casar com segurança já está casado.'));
+    t.innerHTML = tab(['','Extrato','Valor','Título','Venc.','Por quê','Conf.',''],
+      E.fila.map((v,i)=>{
+        const l=v.lanc[0]||{}, x=v.tits[0]||{};
+        return `<tr${i===foco?' style="outline:1px solid var(--alerta);outline-offset:-1px"':''}>
+          <td>${v.forma==='1:1'?'':'<span class="pill">'+v.forma+'</span>'}</td>
+          <td>${esc(l.desc||'')}<div class="meta" style="font-size:12px;color:var(--tenue)">${data(l.data)}</div></td>
+          <td class="d">${fmt(l.cent||0)}</td>
+          <td>${esc(x.parte||'')}${v.tits.length>1?` <span class="pill">+${v.tits.length-1}</span>`:''}
+            <div class="meta" style="font-size:12px;color:var(--tenue)">${x.doc?'doc '+esc(x.doc):''}</div></td>
+          <td class="d">${data(x.venc)}</td>
+          <td style="font-size:12.5px;color:var(--fraco)">${v.motivos.map(esc).join(' · ')}</td>
+          <td class="d">${Math.round(v.escore*100)}%</td>
+          <td class="d"><button class="plano" onclick="foco=${i};desenharFila();scrollTo({top:0,behavior:'smooth'})">abrir</button></td></tr>`;
+      }).join(''));
+  }
+  else if(aba==='conciliado'){
+    if(!E.aprovados.length) return void(t.innerHTML = vazia('Nenhum vínculo confirmado ainda. Confirme os de certeza no painel acima.'));
+    t.innerHTML = tab(['Data','Valor','Extrato','Contraparte','Doc.','Por quê','',''],
+      E.aprovados.map(v=>{
+        const l=v.lanc[0]||{}, x=v.tits[0]||{};
+        return `<tr><td class="d">${data(l.data)}</td><td class="d">${fmt(l.cent||0)}</td>
+          <td>${esc(l.desc||'')}</td>
+          <td>${esc(x.parte||'')}${v.tits.length>1?` <span class="pill">${v.forma}</span>`:''}</td>
+          <td>${esc(x.doc||'')}</td>
+          <td style="font-size:12.5px;color:var(--fraco)">${v.motivos.map(esc).join(' · ')}</td>
+          <td><span class="pill" style="color:var(--ok2)">conciliado</span></td>
+          <td class="d"><button class="plano" onclick="desfazer('${v.id}')">desfazer</button></td></tr>`;
+      }).join(''));
+  }
+  else if(aba==='sobras'){
+    if(!E.sobras.length) return void(t.innerHTML = vazia('Todo lançamento do extrato encontrou um título.'));
+    t.innerHTML = tab(['Data','Valor','Histórico','Classificação','Origem'],
+      E.sobras.map(l=>`<tr><td class="d">${data(l.data)}</td><td class="d">${fmt(l.cent)}</td>
+        <td>${esc(l.desc)||'<i style="color:var(--tenue)">sem histórico</i>'}</td>
+        <td><select onchange="rotular('${esc(l.chave)}', this.value)">
+          ${[l.rotulo, ...ROTULOS.filter(r=>r!==l.rotulo)].map(r=>`<option${r===l.rotulo?' selected':''}>${esc(r)}</option>`).join('')}
+        </select></td>
+        <td><span class="pill">${l.origem==='aprendido'?'você ensinou':l.origem==='par +/-'?'par + e −':l.origem==='lexico'?'reconhecido':'em aberto'}</span></td></tr>`).join(''));
+  }
+  else {
+    if(!E.abertos.length) return void(t.innerHTML = vazia('Nenhum título ficou sem pagamento.'));
+    t.innerHTML = tab(['Vencimento','Valor','Contraparte','Tipo','Doc.','Categoria'],
+      E.abertos.map(x=>`<tr><td class="d">${data(x.venc||x.data)}</td><td class="d">${fmt(x.cent)}</td>
+        <td>${esc(x.parte)}</td><td><span class="pill">${x.tipo==='pagar'?'a pagar':x.tipo==='receber'?'a receber':'—'}</span></td>
+        <td>${esc(x.doc)}</td><td>${esc(x.cat)}</td></tr>`).join(''));
+  }
+}
+const tab = (cols, corpo) => `<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${corpo}</tbody></table>`;
+const vazia = t => `<div class="vazia">${t}</div>`;
+
+api('/api/estado').then(pintar).catch(()=>{});
+</script>
+</body></html>
